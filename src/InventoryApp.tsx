@@ -14,7 +14,6 @@ import {
   Package,
   Plus,
   Search,
-  ShoppingBasket,
   TrendingUp,
   Wallet,
   Pencil,
@@ -320,7 +319,7 @@ function App() {
     const product: Product = {
       id: makeId(),
       name: String(form.get('name')).trim(),
-      category: String(form.get('category')).trim() || 'Other',
+      category: String(form.get('newCategory')).trim() || String(form.get('category')).trim() || 'Other',
       quantity: Number(form.get('quantity')),
       unit: String(form.get('unit')).trim() || 'item',
       cost: Number(form.get('cost')),
@@ -355,7 +354,7 @@ function App() {
     const updated: Product = {
       ...original,
       name: String(form.get('name')).trim(),
-      category: String(form.get('category')).trim() || 'Other',
+      category: String(form.get('newCategory')).trim() || String(form.get('category')).trim() || 'Other',
       unit: String(form.get('unit')).trim() || 'item',
       cost: Number(form.get('cost')),
       price: Number(form.get('price')),
@@ -503,7 +502,7 @@ function App() {
     <div className="app-shell">
       <aside className={`sidebar ${mobileNavOpen ? 'sidebar-open' : ''}`}>
         <a className="brand" href="#overview" onClick={(event) => { event.preventDefault(); setView('overview') }}>
-          <span className="brand-mark"><ShoppingBasket size={21} strokeWidth={2.2} /></span>
+          <span className="brand-mark"><img src="/app-icon.svg" alt="" /></span>
           <span className="brand-name">Anita<small>Store Records</small></span>
         </a>
         <div className="side-label">WORKSPACE</div>
@@ -520,6 +519,7 @@ function App() {
         <div className="sidebar-bottom">
           <div className="storage-indicator"><span className="storage-pulse" /><span>Connected to database</span><Check size={14} /></div>
           <p>Records sync across devices using your shop account.</p>
+          <a className="sign-out-button app-icon-download" href="/app-icon.svg" download="anita-app-icon.svg"><Download size={14} />Download app icon</a>
           <button className="sign-out-button" onClick={() => { void signOut() }}>Sign out</button>
         </div>
       </aside>
@@ -587,7 +587,7 @@ function App() {
       </main>
 
       {notice && <div className="toast" role="status"><span className="toast-check"><Check size={14} /></span>{notice}<button title="Dismiss" onClick={() => setNotice('')}><X size={15} /></button></div>}
-      {dialog?.type === 'product' && <ProductDialog product={dialog.product} onClose={() => setDialog(null)} onSubmit={(event) => dialog.product ? editProduct(event, dialog.product) : addProduct(event)} />}
+      {dialog?.type === 'product' && <ProductDialog product={dialog.product} categories={categories} onClose={() => setDialog(null)} onSubmit={(event) => dialog.product ? editProduct(event, dialog.product) : addProduct(event)} />}
       {editingMovement && <EditMovementDialog movement={editingMovement} product={products.find((item) => item.id === editingMovement.productId)} onClose={() => setEditingMovement(null)} onSubmit={updateMovement} />}
       {dialog?.type === 'movement' && <MovementDialog dialog={dialog} products={products} onClose={() => setDialog(null)} onSubmit={recordMovement} />}
     </div>
@@ -639,8 +639,9 @@ function AuthPanel({ onSignIn, onSignUp, notice }: {
   </main>
 }
 
-function ProductDialog({ product, onClose, onSubmit }: {
+function ProductDialog({ product, categories, onClose, onSubmit }: {
   product?: Product
+  categories: string[]
   onClose: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }) {
@@ -670,7 +671,8 @@ function ProductDialog({ product, onClose, onSubmit }: {
       <form onSubmit={handleSubmit}>
         <div className="form-grid">
           <label className="field full-field">Item name<input name="name" defaultValue={product?.name} placeholder="e.g. Whole wheat bread" required autoFocus /></label>
-          <label className="field">Category<input name="category" defaultValue={product?.category} placeholder="e.g. Bakery" /></label>
+          <label className="field full-field">Existing category<select name="category" defaultValue={product?.category ?? ''}><option value="">Choose a category</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select><ChevronDown className="select-chevron" size={14} /></label>
+          <label className="field full-field">New category <span className="optional-label">optional</span><input name="newCategory" placeholder="Enter a new category" /></label>
           <label className="field">Unit<select name="unit" defaultValue={product?.unit ?? 'piece'}>{!units.includes(product?.unit ?? '') && product?.unit && <option value={product.unit}>{product.unit}</option>}{units.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select><ChevronDown className="select-chevron" size={14} /></label>
           {product ? <label className="field">On hand<input value={`${product.quantity} ${product.unit}`} readOnly /><span className="field-hint">Change with Receive or Sell.</span></label> : <label className="field">Starting quantity<input name="quantity" type="number" min="0" step="any" defaultValue="0" required /></label>}
           <label className="field">Reorder when at<input name="reorderLevel" type="number" min="0" step="any" defaultValue={product?.reorderLevel ?? 5} required /></label>
