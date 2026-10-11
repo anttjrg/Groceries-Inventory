@@ -12,8 +12,95 @@
     --sans: system-ui, "Segoe UI", Roboto, sans-serif;
     --heading: system-ui, "Segoe UI", Roboto, sans-serif;
     --mono: ui-monospace, Consolas, monospace;
+    font: 20px/145% var(--sans);
+    letter-spacing: .18px;
+    --lightningcss-light: initial;
+    --lightningcss-dark: ;
+    color-scheme: light dark;
+    color: var(--text);
+    background: var(--bg);
+    font-synthesis: none;
+    text-rendering: optimizelegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --lightningcss-light: ;
+        --lightningcss-dark: initial
+    }
+}
+
+@media (width<=1024px) {
+    :root {
+        font-size:18px
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --text:#9ca3af;
+        --text-h: #f3f4f6;
+        --bg: #16171d;
+        --border: #2e303a;
+        --code-bg: #1f2028;
+        --accent: #c084fc;
+        --accent-bg: #c084fc26;
+        --accent-border: #c084fc80;
+        --social-bg: #2f303a80;
+        --shadow: #0006 0 10px 15px -3px, #00000040 0 4px 6px -2px
+    }
+
+    #social .button-icon {
+        filter: invert()brightness(2)
+    }
+}
+
+h1 {
+    letter-spacing: -1.68px;
+    margin: 32px 0;
+    font-size: 58px
+}
+
+@media (width<=1024px) {
+    h1 {
+        margin: 20px 0;
+        font-size: 38px
+    }
+}
+
+h2 {
+    letter-spacing: -.24px;
+    margin: 0 0 8px;
+    font-size: 26px;
+    line-height: 118%
+}
+
+@media (width<=1024px) {
+    h2 {
+        font-size: 22px
+    }
+}
+
+:root {
+    --text: #6b6375;
+    --text-h: #08060d;
+    --bg: #fff;
+    --border: #e5e4e7;
+    --code-bg: #f4f3ec;
+    --accent: #aa3bff;
+    --accent-bg: #aa3bff1a;
+    --accent-border: #aa3bff80;
+    --social-bg: #f4f3ec80;
+    --shadow: #0000001a 0 10px 15px -3px, #0000000d 0 4px 6px -2px;
+    --sans: system-ui, "Segoe UI", Roboto, sans-serif;
+    --heading: system-ui, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, Consolas, monospace;
     font: 18px/145% var(--sans);
     letter-spacing: .18px;
+    --lightningcss-light: initial;
+    --lightningcss-dark: ;
     --lightningcss-light: initial;
     --lightningcss-dark: ;
     color-scheme: light dark;
@@ -141,6 +228,8 @@ code {
     background: var(--paper);
     --lightningcss-light: initial;
     --lightningcss-dark: ;
+    --lightningcss-light: initial;
+    --lightningcss-dark: ;
     color-scheme: light;
     font-synthesis: none;
     text-rendering: optimizelegibility;
@@ -209,7 +298,7 @@ button,input,select {
 .brand-mark img {
     width: 100%;
     height: 100%;
-    display: block;
+    display: block
 }
 
 .brand-name {
@@ -287,7 +376,7 @@ button,input,select {
 .alert-link {
     gap: 10px;
     min-height: 38px;
-    font-size: 16px;
+    font-size: 16px
 }
 
 .alert-dot,.storage-pulse {
@@ -333,7 +422,7 @@ button,input,select {
     color: #88a494;
     margin: 8px 0 0 15px;
     font-size: 13px;
-    display: none;
+    display: none
 }
 
 .main-area {
@@ -354,7 +443,7 @@ button,input,select {
 
 .breadcrumbs {
     color: #89928c;
-    font-size: 16px;
+    font-size: 16px
 }
 
 .breadcrumbs span {
@@ -496,7 +585,7 @@ button,input,select {
 
 .page-heading p {
     color: #7c877f;
-    font-size: 14px;
+    font-size: 14px
 }
 
 .page-heading>.button {
@@ -661,12 +750,12 @@ button.metric-card:hover {
 
 .today-strip strong {
     color: #365740;
-    font-size: 16px;
+    font-size: 16px
 }
 
 .today-strip span {
     color: #7d8b7e;
-    font-size: 14px;
+    font-size: 14px
 }
 
 .today-strip>button {
@@ -717,13 +806,13 @@ button.metric-card:hover {
 
 .gcash-overview-figures small {
     color: #7d8b7e;
-    font-size: 14px;
+    font-size: 14px
 }
 
 .gcash-overview-figures strong {
     color: #365740;
     font-variant-numeric: tabular-nums;
-    font-size: 14px;
+    font-size: 14px
 }
 
 .gcash-overview-figures .gcash-overview-total {
@@ -762,7 +851,7 @@ button.metric-card:hover {
 
 .panel-heading p {
     color: #89928b;
-    font-size: 14px;
+    font-size: 14px
 }
 
 .text-link {
@@ -897,7 +986,7 @@ button.metric-card:hover {
 }
 
 .receive-quick {
-    color: #67806F;
+    color: #67806f;
     cursor: pointer;
     background: #fff;
     border: 1px solid #e6ece5;
@@ -963,7 +1052,7 @@ button.metric-card:hover {
 }
 
 .activity-description span {
-    font-size: 14px;
+    font-size: 14px
 }
 
 .activity-amount {
@@ -985,7 +1074,7 @@ button.metric-card:hover {
 
 .activity-amount span {
     color: #929b94;
-    font-size: 14px;
+    font-size: 14px
 }
 
 .page-note {
@@ -1063,7 +1152,7 @@ button.metric-card:hover {
     width: 100%;
     min-width: 0;
     padding: 0;
-    font-size: 14px;
+    font-size: 14px
 }
 
 .search-box input::placeholder {
@@ -1097,7 +1186,7 @@ button.metric-card:hover {
     border-radius: 5px;
     min-height: 31px;
     padding: 5px 10px;
-    font-size: 16px;
+    font-size: 16px
 }
 
 .filter-tab:hover {
@@ -1131,36 +1220,36 @@ button.metric-card:hover {
 }
 
 .table-summary-right {
-    font-size: 15px;
+    font-size: 15px
 }
 
 .inventory-pagination {
-    display: flex;
-    align-items: center;
+    color: #77817a;
+    border-top: 1px solid #edf0ec;
     justify-content: space-between;
+    align-items: center;
     gap: 12px;
     padding: 10px 14px;
-    border-top: 1px solid #edf0ec;
-    color: #77817a;
     font-size: 12px;
+    display: flex
 }
 
-.inventory-pagination > div {
-    display: flex;
+.inventory-pagination>div {
     align-items: center;
     gap: 8px;
+    display: flex
 }
 
 .inventory-pagination .button {
-    min-height: 32px;
+    min-height: 32px
 }
 
 .price-validation-error {
-    grid-column: 1 / -1;
-    margin: 0;
     color: #963e34;
+    grid-column: 1/-1;
+    margin: 0;
     font-size: 12px;
-    line-height: 1.5;
+    line-height: 1.5
 }
 
 .table-scroll {
@@ -1205,7 +1294,7 @@ button.metric-card:hover {
     border-bottom: 1px solid #eff2ee;
     height: 60px;
     padding: 6px 12px;
-    font-size: 14px;
+    font-size: 14px
 }
 
 .inventory-table tbody tr:last-child td {
@@ -1293,12 +1382,12 @@ button.metric-card:hover {
 
 .empty-table strong {
     color: #425447;
-    font-size: 16px;
+    font-size: 16px
 }
 
 .empty-table span {
     color: #909a92;
-    font-size: 14px;
+    font-size: 14px
 }
 
 .log-panel {
@@ -1448,7 +1537,7 @@ button.metric-card:hover {
 
 .modal-heading p {
     color: #829087;
-    font-size: 12px;
+    font-size: 12px
 }
 
 .modal-heading .icon-button {
@@ -1519,7 +1608,8 @@ button.metric-card:hover {
     color: #9ba49d;
     margin-left: 3px;
     font-size: 12px;
-    font-weight: 400
+    font-weight: 400;
+    display: none;
 }
 
 .modal-actions {
@@ -1614,8 +1704,8 @@ button.metric-card:hover {
     }
 
     .brand {
-        padding: 0;
-        gap: 0px;
+        gap: 0;
+        padding: 0
     }
 
     .brand-mark {
@@ -1720,9 +1810,9 @@ button.metric-card:hover {
     }
 
     .brand {
-        padding: 0 0px;
         gap: 11px;
         margin-bottom: 15px;
+        padding: 0
     }
 
     .brand-mark {
@@ -2202,7 +2292,7 @@ button.metric-card:hover {
 
 .sales-summary-card>small {
     color: #89958b;
-    font-size: 14px;
+    font-size: 14px
 }
 
 .daily-breakdown,.sales-record-panel,.gcash-summary-panel {
@@ -2216,7 +2306,7 @@ button.metric-card:hover {
 .record-count {
     color: #748278;
     white-space: nowrap;
-    font-size: 14px;
+    font-size: 14px
 }
 
 .daily-summary-table th,.daily-summary-table td {
@@ -2251,7 +2341,7 @@ button.metric-card:hover {
 
 .gcash-summary-table td:last-child {
     color: #748178;
-    font-size: 14px;
+    font-size: 14px
 }
 
 .gcash-summary-table tfoot td:last-child {
@@ -2495,7 +2585,7 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
     outline: 0;
     min-width: 108px;
     padding: 0 19px 0 0;
-    font-size: 14px;
+    font-size: 14px
 }
 
 .category-filter>svg {
@@ -2508,7 +2598,7 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
 .row-actions .inventory-edit-action {
     color: #627b68;
     width: 30px;
-    height: 36px;
+    height: 36px
 }
 
 .row-actions .inventory-edit-action:hover {
@@ -2518,13 +2608,13 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
 }
 
 .row-actions .inventory-delete-action {
-    color: #a34f45;
+    color: #a34f45
 }
 
 .row-actions .inventory-delete-action:hover {
     color: #8e392f;
     background: #fff3f1;
-    border-color: #e8c4bf;
+    border-color: #e8c4bf
 }
 
 .field-hint {
@@ -2687,15 +2777,15 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
 .sidebar-bottom .sign-out-button {
     color: #bad2bf;
     margin: 12px 0 0 15px;
-    font-size: 16px;
+    font-size: 16px
 }
 
 .sidebar-bottom .app-icon-download {
     align-items: center;
     gap: 5px;
-    display: flex;
     width: fit-content;
     text-decoration: none;
+    display: flex
 }
 
 .legacy-import-banner {
@@ -2892,12 +2982,12 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
     }
 
     .inventory-pagination {
-        align-items: flex-start;
-        flex-direction: column
+        flex-direction: column;
+        align-items: flex-start
     }
 
     .inventory-pagination>div {
-        width: 100%;
-        justify-content: space-between
+        justify-content: space-between;
+        width: 100%
     }
 }
