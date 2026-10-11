@@ -287,6 +287,7 @@ body:has(.gcash-summary-panel) .sales-summary-grid { display: none; }
 .legacy-import-banner span { color: #77867b; font-size: 10px; }
 @media (max-width: 620px) { .legacy-import-banner { align-items: flex-start; flex-direction: column; } }
 @media (max-width: 620px) {
+  .app-shell, .main-area, .page-content { width: 100%; min-width: 0; max-width: 100%; }
   .topbar { min-width: 0; gap: 7px; padding-right: 10px; padding-left: 10px; }
   .breadcrumbs { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .topbar-actions { flex: 0 0 auto; }
@@ -300,4 +301,11 @@ body:has(.gcash-summary-panel) .sales-summary-grid { display: none; }
   .form-grid .full-field { grid-column: auto; }
   .modal-actions { position: sticky; bottom: -16px; margin-right: -16px; margin-left: -16px; padding: 12px 16px max(4px, env(safe-area-inset-bottom)); background: #fff; }
   .toast { max-width: calc(100vw - 24px); }
+  .period-toolbar, .period-navigation, .sales-summary-grid, .sales-summary-card,
+  .daily-breakdown, .sales-record-panel, .table-scroll { width: 100%; min-width: 0; max-width: 100%; }
+  .period-navigation { flex-wrap: wrap; }
+  .period-date-control { min-width: 0; flex: 1 1 145px; }
+  .period-date-picker { width: 100%; justify-content: center; }
+  .period-date-picker > span { min-width: 0; }
+  .sales-summary-grid { grid-template-columns: minmax(0, 1fr); }
 }
