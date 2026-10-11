@@ -4,18 +4,18 @@ import './anita.css'
 
 export type SaleRecord = { id: string; productName: string; type: 'sale'; quantity: number; unitCost: number; unitPrice: number; date: string; note: string }
 export type GcashTransaction = { id: string; date: string; service: string; amount: number; fee: number; customerName: string; phoneNumber: string; reference: string }
-type Period = 'day' | 'week' | 'month' | 'year'
-type DateRange = { start: string; end: string }
+export type Period = 'day' | 'week' | 'month' | 'year'
+export type DateRange = { start: string; end: string }
 const services = ['Cash in', 'Cash out', 'Load', 'Bills payment', 'Payment']
 export const TABLE_PAGE_SIZE = 10
 
-function todayString(date = new Date()) {
+export function todayString(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 function parseDate(value: string) { const [year, month, day] = value.split('-').map(Number); return new Date(year, month - 1, day, 12) }
 function dateText(value: string, options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' }) { return parseDate(value).toLocaleDateString(undefined, options) }
 function amountText(value: number) { return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value) }
-function rangeFor(date: string, period: Period): DateRange {
+export function rangeFor(date: string, period: Period): DateRange {
   const start = parseDate(date), end = parseDate(date)
   if (period === 'week') { start.setDate(start.getDate() - (start.getDay() + 6) % 7); end.setTime(start.getTime()); end.setDate(start.getDate() + 6) }
   if (period === 'month') { start.setDate(1); end.setMonth(start.getMonth() + 1, 0) }
@@ -80,7 +80,7 @@ export function TablePagination({ itemCount, page, onPageChange, label }: {
   </nav>
 }
 
-function PeriodPicker({ period, setPeriod, date, setDate }: { period: Period; setPeriod: (value: Period) => void; date: string; setDate: (value: string) => void }) {
+export function PeriodPicker({ period, setPeriod, date, setDate }: { period: Period; setPeriod: (value: Period) => void; date: string; setDate: (value: string) => void }) {
   const range = rangeFor(date, period)
   const dateInputRef = useRef<HTMLInputElement>(null)
   function openCalendar() {

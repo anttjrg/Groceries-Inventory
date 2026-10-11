@@ -22,7 +22,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { GcashPage, KeyMetricsPage, SalesPage, TablePagination, TABLE_PAGE_SIZE, type GcashTransaction } from './SalesPages.tsx'
+import { GcashPage, KeyMetricsPage, PeriodPicker, rangeFor, SalesPage, TablePagination, TABLE_PAGE_SIZE, todayString, type GcashTransaction, type Period } from './SalesPages.tsx'
 import type { Movement, Product } from './types.ts'
 import {
   addCategory as saveNewCategory,
@@ -110,6 +110,9 @@ function App() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [inventoryPage, setInventoryPage] = useState(1)
   const [activityPage, setActivityPage] = useState(1)
+  const [activityQuery, setActivityQuery] = useState('')
+  const [activityPeriod, setActivityPeriod] = useState<Period>('day')
+  const [activityDate, setActivityDate] = useState(todayString())
   const [categoryQuery, setCategoryQuery] = useState('')
   const [categoryPage, setCategoryPage] = useState(1)
   const [editingCategory, setEditingCategory] = useState<string | null>(null)
@@ -251,9 +254,15 @@ function App() {
   const firstVisibleItem = visibleProducts.length ? pageStartIndex + 1 : 0
   const lastVisibleItem = Math.min(pageStartIndex + TABLE_PAGE_SIZE, visibleProducts.length)
   const orderedMovements = [...movements].sort((left, right) => right.date.localeCompare(left.date))
-  const totalActivityPages = Math.max(1, Math.ceil(orderedMovements.length / TABLE_PAGE_SIZE))
+  const activityRange = rangeFor(activityDate, activityPeriod)
+  const visibleMovements = orderedMovements.filter((movement) => {
+    const matchesDate = movement.date >= activityRange.start && movement.date <= activityRange.end
+    const activityText = `${movement.productName} ${movement.note} ${movement.type} ${movement.type === 'purchase' ? 'stock in' : 'sale'}`.toLowerCase()
+    return matchesDate && activityText.includes(activityQuery.trim().toLowerCase())
+  })
+  const totalActivityPages = Math.max(1, Math.ceil(visibleMovements.length / TABLE_PAGE_SIZE))
   const currentActivityPage = Math.min(activityPage, totalActivityPages)
-  const pageMovements = orderedMovements.slice((currentActivityPage - 1) * TABLE_PAGE_SIZE, currentActivityPage * TABLE_PAGE_SIZE)
+  const pageMovements = visibleMovements.slice((currentActivityPage - 1) * TABLE_PAGE_SIZE, currentActivityPage * TABLE_PAGE_SIZE)
   const recentMovements = orderedMovements.slice(0, 6)
 
   async function signIn(email: string, password: string) {
@@ -757,8 +766,12 @@ function App() {
           </>}
 
           {view === 'activity' && <>
-            <section className="page-heading inventory-heading"><div><div className="eyebrow"><span className="eyebrow-line" />MOVEMENT LOG</div><h1>Stock activity.</h1><p>A dated record of everything received and sold.</p></div><button className="button button-primary" onClick={() => setDialog({ type: 'movement', productId: products[0]?.id ?? '', movement: 'purchase' })} disabled={!products.length}><Plus size={17} />Record purchase</button></section>
-            <div className="panel log-panel"><div className="table-scroll"><table className="inventory-table movement-table"><thead><tr><th>DATE</th><th>ITEM</th><th>ACTIVITY</th><th>QUANTITY</th><th>UNIT COST</th><th>SALE PRICE</th><th>TOTAL</th><th><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{pageMovements.map((movement) => <tr key={movement.id}><td>{dateLabel(movement.date)}</td><td><strong className="item-name">{movement.productName}</strong><span className="subline">{movement.note}</span></td><td><span className={`movement-badge ${movement.type}`}>{movement.type === 'purchase' ? <><ArrowDownLeft size={13} />Stock in</> : <><ArrowUpRight size={13} />Sale</>}</span></td><td>{movement.quantity}</td><td>{money(movement.unitCost ?? movement.unitPrice)}</td><td>{movement.type === 'sale' ? money(movement.unitPrice) : '-'}</td><td><strong>{money(movement.quantity * movement.unitPrice)}</strong></td><td><div className="row-actions"><button title="Edit activity" onClick={() => setEditingMovement(movement)}><Pencil size={14} /></button><button title="Delete activity" onClick={() => deleteMovement(movement.id)}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table></div>{!movements.length && <div className="empty-table"><Clock3 size={24} /><strong>No activity recorded</strong><span>When you receive stock or record a sale, it will show here.</span></div>}<TablePagination itemCount={orderedMovements.length} page={currentActivityPage} onPageChange={setActivityPage} label="Stock activity" /></div>
+            <section className="page-heading inventory-heading"><div><div className="eyebrow"><span className="eyebrow-line" />MOVEMENT LOG</div><h1>Stock activity.</h1><p>A dated record of everything received and sold.</p></div></section>
+            <div className="activity-toolbar">
+              <div className="search-box activity-search"><Search size={17} /><input aria-label="Search stock activity" placeholder="Search items or activity..." value={activityQuery} onChange={(event) => { setActivityPage(1); setActivityQuery(event.target.value) }} /></div>
+              <PeriodPicker period={activityPeriod} setPeriod={(value) => { setActivityPage(1); setActivityPeriod(value) }} date={activityDate} setDate={(value) => { setActivityPage(1); setActivityDate(value) }} />
+            </div>
+            <div className="panel log-panel"><div className="table-scroll"><table className="inventory-table movement-table"><thead><tr><th>DATE</th><th>ITEM</th><th>ACTIVITY</th><th>QUANTITY</th><th>UNIT COST</th><th>SALE PRICE</th><th>TOTAL</th><th><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{pageMovements.map((movement) => <tr key={movement.id}><td>{dateLabel(movement.date)}</td><td><strong className="item-name">{movement.productName}</strong><span className="subline">{movement.note}</span></td><td><span className={`movement-badge ${movement.type}`}>{movement.type === 'purchase' ? <><ArrowDownLeft size={13} />Stock in</> : <><ArrowUpRight size={13} />Sale</>}</span></td><td>{movement.quantity}</td><td>{money(movement.unitCost ?? movement.unitPrice)}</td><td>{movement.type === 'sale' ? money(movement.unitPrice) : '-'}</td><td><strong>{money(movement.quantity * movement.unitPrice)}</strong></td><td><div className="row-actions"><button title="Edit activity" onClick={() => setEditingMovement(movement)}><Pencil size={14} /></button><button title="Delete activity" onClick={() => deleteMovement(movement.id)}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table></div>{!visibleMovements.length && <div className="empty-table"><Clock3 size={24} /><strong>{movements.length ? 'No matching activity' : 'No activity recorded'}</strong><span>{movements.length ? 'Try another search or date range.' : 'When you receive stock or record a sale, it will show here.'}</span></div>}<TablePagination itemCount={visibleMovements.length} page={currentActivityPage} onPageChange={setActivityPage} label="Stock activity" /></div>
           </>}
           {view === 'sales' && <SalesPage sales={movements.filter((movement): movement is Movement & { type: 'sale' } => movement.type === 'sale').map((movement) => ({ ...movement, unitCost: movement.unitCost ?? products.find((product) => product.id === movement.productId)?.cost ?? 0 }))} onEdit={(id) => setEditingMovement(movements.find((movement) => movement.id === id) ?? null)} onDelete={deleteMovement} />}
           {view === 'gcash' && <GcashPage records={gcashRecords} onSave={persistGcashRecord} onDelete={removeGcashRecord} />}

@@ -2553,6 +2553,18 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
     display: flex
 }
 
+.activity-toolbar {
+    margin-bottom: 14px
+}
+
+.activity-search {
+    width: min(420px,100%)
+}
+
+.activity-toolbar .period-toolbar {
+    margin: 8px 0 14px
+}
+
 .inventory-search-controls .search-box {
     width: min(310px,30vw)
 }
