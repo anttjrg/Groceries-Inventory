@@ -1795,6 +1795,13 @@ button.metric-card:hover {
     }
 }
 
+@media (max-width: 850px) and (min-width: 621px) {
+    .storage-indicator,
+    .sidebar-bottom .app-install-button {
+        display: none;
+    }
+}
+
 @media (width<=620px) {
     .sidebar {
         align-items: stretch;
@@ -2821,6 +2828,16 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
     font-size: 15px
 }
 
+.category-list-heading>div {
+    gap: 4px;
+    display: grid
+}
+
+.category-search {
+    flex: 0 1 290px;
+    min-height: 36px
+}
+
 .category-row {
     border-top: 1px solid #eff2ee;
     justify-content: space-between;
@@ -2888,6 +2905,18 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
 .category-rename-form input:focus {
     border-color: #9db99e;
     box-shadow: 0 0 0 3px #eaf2e9
+}
+
+@media (width<=620px) {
+    .category-list-heading {
+        align-items: stretch;
+        flex-direction: column
+    }
+
+    .category-search {
+        width: 100%;
+        flex-basis: auto
+    }
 }
 
 .legacy-import-banner {

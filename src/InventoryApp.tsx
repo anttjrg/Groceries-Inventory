@@ -108,6 +108,8 @@ function App() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [inventoryPage, setInventoryPage] = useState(1)
   const [activityPage, setActivityPage] = useState(1)
+  const [categoryQuery, setCategoryQuery] = useState('')
+  const [categoryPage, setCategoryPage] = useState(1)
   const [editingCategory, setEditingCategory] = useState<string | null>(null)
   const [dialog, setDialog] = useState<Dialog>(null)
   const [notice, setNotice] = useState('')
@@ -223,6 +225,14 @@ function App() {
   const todayGcashFees = todayGcash.reduce((sum, record) => sum + record.fee, 0)
   const inventoryValue = products.reduce((total, product) => total + product.quantity * product.cost, 0)
   const todayPurchaseUnits = todayPurchases.reduce((total, movement) => total + movement.quantity, 0)
+
+  const visibleCategories = categories.filter((category) => category.toLowerCase().includes(categoryQuery.trim().toLowerCase()))
+  const totalCategoryPages = Math.max(1, Math.ceil(visibleCategories.length / TABLE_PAGE_SIZE))
+  const currentCategoryPage = Math.min(categoryPage, totalCategoryPages)
+  const pageCategories = visibleCategories.slice(
+    (currentCategoryPage - 1) * TABLE_PAGE_SIZE,
+    currentCategoryPage * TABLE_PAGE_SIZE,
+  )
 
   const visibleProducts = products.filter((product) => {
     const matchesQuery = `${product.name} ${product.category}`.toLowerCase().includes(query.toLowerCase())
@@ -572,6 +582,7 @@ function App() {
       return
     }
     setCategories((current) => [...current, name].sort((left, right) => left.localeCompare(right)))
+    setCategoryPage(1)
     formElement.reset()
     setNotice(`${name} category added`)
   }
@@ -705,8 +716,11 @@ function App() {
                 <label className="field full-field">Category name<input name="categoryName" placeholder="e.g. Bakery" maxLength={80} required /></label>
                 <button className="button button-primary" type="submit"><Plus size={16} />Add category</button>
               </form>
-              <div className="category-list-heading"><h2>Existing categories</h2><span className="record-count">{categories.length} categories</span></div>
-              {categories.length ? <div className="category-list">{categories.map((category) => {
+              <div className="category-list-heading">
+                <div><h2>Existing categories</h2><span className="record-count">{visibleCategories.length} of {categories.length} categories</span></div>
+                <label className="search-box category-search"><Search size={15} /><input aria-label="Search categories" placeholder="Search categories..." value={categoryQuery} onChange={(event) => { setCategoryQuery(event.target.value); setCategoryPage(1) }} /></label>
+              </div>
+              {pageCategories.length ? <div className="category-list">{pageCategories.map((category) => {
                 const productCount = products.filter((product) => product.category === category).length
                 return <div className="category-row" key={category}>
                   {editingCategory === category
@@ -724,7 +738,8 @@ function App() {
                       </div>
                     </>}
                 </div>
-              })}</div> : <div className="empty-table"><Boxes size={24} /><strong>No categories yet</strong><span>Add a category to organize your inventory.</span></div>}
+              })}</div> : <div className="empty-table"><Boxes size={24} /><strong>{categoryQuery ? 'No matching categories' : 'No categories yet'}</strong><span>{categoryQuery ? 'Try another category name.' : 'Add a category to organize your inventory.'}</span></div>}
+              <TablePagination itemCount={visibleCategories.length} page={currentCategoryPage} onPageChange={setCategoryPage} label="Categories" />
             </section>
           </>}
 
