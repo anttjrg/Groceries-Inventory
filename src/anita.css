@@ -1795,22 +1795,6 @@ button.metric-card:hover {
     }
 }
 
-@media (max-width: 850px) and (min-width: 621px) {
-    .storage-indicator {
-        display: none;
-    }
-
-    .sidebar-bottom .sign-out-button {
-        align-items: center;
-        justify-content: center;
-        width: 44px;
-        height: 40px;
-        margin: 12px 0 0;
-        font-size: 0;
-        display: flex;
-    }
-}
-
 @media (width<=620px) {
     .sidebar {
         align-items: stretch;
@@ -2793,7 +2777,10 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
 .sidebar-bottom .sign-out-button {
     color: #bad2bf;
     margin: 12px 0 0 15px;
-    font-size: 16px
+    font-size: 16px;
+    display: flex;
+    gap: 5px;
+    align-items: center;
 }
 
 .sidebar-bottom .app-install-button {
@@ -3129,5 +3116,23 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
     .inventory-pagination>div {
         justify-content: space-between;
         width: 100%
+    }
+}
+
+@media (max-width: 850px) and (min-width: 621px) {
+    .sidebar .sidebar-bottom .storage-indicator {
+        display: none;
+    }
+}
+
+@media (max-width: 820px) and (min-width: 621px) {
+    .sidebar .sidebar-bottom .sign-out-button {
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 40px;
+        margin: 12px 0 0;
+        font-size: 0;
+        display: flex;
     }
 }
