@@ -2786,6 +2786,110 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
     display: flex
 }
 
+.category-manager {
+    margin-top: 2px
+}
+
+.category-add-form {
+    grid-template-columns: minmax(0,1fr) auto;
+    align-items: end;
+    gap: 12px;
+    padding: 16px;
+    display: grid
+}
+
+.category-add-form .field {
+    grid-column: auto
+}
+
+.category-add-form>.button {
+    min-height: 36px
+}
+
+.category-list-heading {
+    border-top: 1px solid #edf0ec;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    display: flex
+}
+
+.category-list-heading h2 {
+    color: #34443a;
+    margin: 0;
+    font-size: 15px
+}
+
+.category-row {
+    border-top: 1px solid #eff2ee;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    min-height: 60px;
+    padding: 10px 16px;
+    display: flex
+}
+
+.category-row-info {
+    gap: 4px;
+    display: grid
+}
+
+.category-row-info strong {
+    color: #34443a;
+    font-size: 14px
+}
+
+.category-row-info span {
+    color: #89958c;
+    font-size: 12px
+}
+
+.category-row .row-actions {
+    gap: 7px
+}
+
+.category-row .row-actions button {
+    width: 32px;
+    height: 32px
+}
+
+.category-row .row-actions .category-delete-action {
+    color: #a34f45
+}
+
+.category-row .row-actions .category-delete-action:hover {
+    color: #8e392f;
+    background: #fff3f1;
+    border-color: #e8c4bf
+}
+
+.category-rename-form {
+    grid-template-columns: minmax(0,1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    display: grid
+}
+
+.category-rename-form input {
+    color: #3b4a3f;
+    background: #fff;
+    border: 1px solid #e2e8e1;
+    border-radius: 5px;
+    outline: 0;
+    width: 100%;
+    height: 36px;
+    padding: 0 10px;
+    font-size: 14px
+}
+
+.category-rename-form input:focus {
+    border-color: #9db99e;
+    box-shadow: 0 0 0 3px #eaf2e9
+}
+
 .legacy-import-banner {
     background: #edf5ed;
     border: 1px solid #dce8dc;

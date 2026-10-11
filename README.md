@@ -4,13 +4,15 @@
 
 The app uses Supabase Auth and PostgreSQL for products, stock movements, and GCash transactions.
 
-1. In the Supabase dashboard, open **SQL Editor** and run [`supabase/schema.sql`](./supabase/schema.sql). This creates the tables, enables row-level security, and adds database functions for stock updates.
+1. In the Supabase dashboard, open **SQL Editor** and run [`supabase/schema.sql`](./supabase/schema.sql). This creates the tables, enables row-level security, and adds database functions for stock updates. If the app was already set up, run the updated script again to create the categories table and migrate categories from existing products.
 2. In **Project Settings → API**, copy the project URL and the **publishable** key. Put them in the root `.env.local` file as `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. Never put a Secret/service-role key in a Vite environment variable or browser code.
 3. Restart the Vite development server after changing `.env.local`.
 4. Open the app and create one shop account. Sign in with that same account on every device that should see the shop's records. If email confirmation is enabled in Supabase, confirm the address before signing in.
 5. If the app finds records previously stored in this browser and the database is empty, choose **Import records** to copy them into Supabase.
 
 The `.env.local` file is ignored by Git. Database access is restricted to authenticated users by row-level security. If the tables were created earlier using a different schema, review the SQL Editor output and resolve any existing-table migration errors before using the app.
+
+Categories can be added, renamed, and deleted from the **Category** section. Deleting a category also permanently deletes its products and their stock activity records.
 
 If a Supabase Secret/service-role key has been shared or exposed, rotate it in the Supabase dashboard. This app does not need that key.
 

@@ -36,6 +36,13 @@ create table if not exists public.gcash_transactions (
   reference text not null default ''
 );
 
+create table if not exists public.categories (
+  id text primary key default gen_random_uuid()::text,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name text not null,
+  unique (user_id, name)
+);
+
 alter table public.products
   add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table public.products alter column user_id set default auth.uid();
@@ -46,12 +53,22 @@ alter table public.gcash_transactions
   add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table public.gcash_transactions alter column user_id set default auth.uid();
 
+insert into public.categories (user_id, name)
+select user_id, trim(category)
+from public.products
+where user_id is not null and nullif(trim(category), '') is not null
+group by user_id, trim(category)
+on conflict (user_id, name) do nothing;
+
 alter table public.products enable row level security;
 alter table public.movements enable row level security;
 alter table public.gcash_transactions enable row level security;
+alter table public.categories enable row level security;
 
 revoke all on public.products, public.movements, public.gcash_transactions from anon;
 grant select, insert, update, delete on public.products, public.movements, public.gcash_transactions to authenticated;
+revoke all on public.categories from anon;
+grant select, insert, update, delete on public.categories to authenticated;
 
 drop policy if exists "Shop users manage their products" on public.products;
 create policy "Shop users manage their products" on public.products
@@ -68,6 +85,11 @@ create policy "Shop users manage their GCash transactions" on public.gcash_trans
   for all to authenticated using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
+drop policy if exists "Shop users manage their categories" on public.categories;
+create policy "Shop users manage their categories" on public.categories
+  for all to authenticated using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
 create or replace function public.create_product_with_opening_stock(
   p_product jsonb,
   p_movement jsonb default null
@@ -75,6 +97,10 @@ create or replace function public.create_product_with_opening_stock(
 language plpgsql
 as $$
 begin
+  insert into public.categories (user_id, name)
+  values (auth.uid(), trim(p_product->>'category'))
+  on conflict (user_id, name) do nothing;
+
   insert into public.products (
     id, user_id, name, category, quantity, unit, cost, price, reorder_level, expiry_date
   ) values (
@@ -233,6 +259,61 @@ begin
 end;
 $$;
 
+create or replace function public.rename_category(p_old_name text, p_new_name text)
+returns void
+language plpgsql
+as $$
+declare
+  v_category public.categories%rowtype;
+  v_new_name text := trim(p_new_name);
+begin
+  if v_new_name = '' then raise exception 'Category name cannot be empty'; end if;
+
+  select * into v_category from public.categories
+  where user_id = auth.uid() and name = trim(p_old_name)
+  for update;
+  if not found then raise exception 'Category not found'; end if;
+  if exists (
+    select 1 from public.categories
+    where user_id = auth.uid() and lower(name) = lower(v_new_name) and id <> v_category.id
+  ) then raise exception 'A category with this name already exists'; end if;
+
+  update public.products
+  set category = v_new_name
+  where user_id = auth.uid() and category = v_category.name;
+
+  update public.categories set name = v_new_name
+  where id = v_category.id and user_id = auth.uid();
+end;
+$$;
+
+create or replace function public.delete_category(p_name text)
+returns void
+language plpgsql
+as $$
+declare
+  v_category public.categories%rowtype;
+begin
+  select * into v_category from public.categories
+  where user_id = auth.uid() and name = trim(p_name)
+  for update;
+  if not found then raise exception 'Category not found'; end if;
+
+  delete from public.movements
+  where user_id = auth.uid()
+    and product_id in (
+      select id from public.products
+      where user_id = auth.uid() and category = v_category.name
+    );
+
+  delete from public.products
+  where user_id = auth.uid() and category = v_category.name;
+
+  delete from public.categories
+  where id = v_category.id and user_id = auth.uid();
+end;
+$$;
+
 create or replace function public.import_legacy_records(
   p_products jsonb,
   p_movements jsonb,
@@ -241,6 +322,12 @@ create or replace function public.import_legacy_records(
 language plpgsql
 as $$
 begin
+  insert into public.categories (user_id, name)
+  select auth.uid(), trim(item->>'category')
+  from jsonb_array_elements(p_products) as source(item)
+  where nullif(trim(item->>'category'), '') is not null
+  on conflict (user_id, name) do nothing;
+
   insert into public.products as existing (
     id, user_id, name, category, quantity, unit, cost, price, reorder_level, expiry_date
   )
@@ -298,9 +385,13 @@ revoke all on function public.record_stock_movement(jsonb) from public, anon;
 revoke all on function public.update_stock_movement(jsonb) from public, anon;
 revoke all on function public.delete_stock_movement(text) from public, anon;
 revoke all on function public.delete_product_with_activity(text) from public, anon;
+revoke all on function public.rename_category(text, text) from public, anon;
+revoke all on function public.delete_category(text) from public, anon;
 grant execute on function public.create_product_with_opening_stock(jsonb, jsonb) to authenticated;
 grant execute on function public.record_stock_movement(jsonb) to authenticated;
 grant execute on function public.update_stock_movement(jsonb) to authenticated;
 grant execute on function public.delete_stock_movement(text) to authenticated;
 grant execute on function public.delete_product_with_activity(text) to authenticated;
+grant execute on function public.rename_category(text, text) to authenticated;
+grant execute on function public.delete_category(text) to authenticated;
 grant execute on function public.import_legacy_records(jsonb, jsonb, jsonb) to authenticated;

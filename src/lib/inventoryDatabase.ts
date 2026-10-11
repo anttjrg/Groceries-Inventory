@@ -6,15 +6,23 @@ function throwIfError(error: { message: string } | null) {
   if (error) throw new Error(error.message)
 }
 
+function isMissingCategoriesTable(error: { code?: string } | null) {
+  return error?.code === '42P01' || error?.code === 'PGRST205'
+}
+
 export async function loadInventory() {
-  const [productsResult, movementsResult, gcashResult] = await Promise.all([
+  const [productsResult, movementsResult, gcashResult, categoriesResult] = await Promise.all([
     supabase.from('products').select('*').order('name'),
     supabase.from('movements').select('*').order('date', { ascending: false }),
     supabase.from('gcash_transactions').select('*').order('date', { ascending: false }),
+    supabase.from('categories').select('name').order('name'),
   ])
   throwIfError(productsResult.error)
   throwIfError(movementsResult.error)
   throwIfError(gcashResult.error)
+  if (categoriesResult.error && !isMissingCategoriesTable(categoriesResult.error)) {
+    throwIfError(categoriesResult.error)
+  }
 
   const products: Product[] = (productsResult.data ?? []).map((row) => ({
     id: row.id,
@@ -48,7 +56,36 @@ export async function loadInventory() {
     phoneNumber: row.phone_number,
     reference: row.reference,
   }))
-  return { products, movements, gcashRecords }
+  const categories = categoriesResult.error
+    ? [...new Set(products.map((product) => product.category))].sort((left, right) => left.localeCompare(right))
+    : (categoriesResult.data ?? []).map((row) => row.name)
+  return {
+    products,
+    movements,
+    gcashRecords,
+    categories,
+    categorySetupRequired: Boolean(categoriesResult.error),
+  }
+}
+
+export async function addCategory(name: string) {
+  const { error } = await supabase.from('categories').insert({ name })
+  throwIfError(error)
+}
+
+export async function renameCategory(oldName: string, newName: string) {
+  const { error } = await supabase.rpc('rename_category', {
+    p_old_name: oldName,
+    p_new_name: newName,
+  })
+  throwIfError(error)
+}
+
+export async function deleteCategory(name: string) {
+  const { error } = await supabase.rpc('delete_category', {
+    p_name: name,
+  })
+  throwIfError(error)
 }
 
 export async function importLegacyRecords(
@@ -73,6 +110,12 @@ export async function createProduct(product: Product, openingMovement?: Movement
 }
 
 export async function updateProduct(product: Product) {
+  const { error: categoryError } = await supabase.from('categories').upsert(
+    { name: product.category },
+    { onConflict: 'user_id,name', ignoreDuplicates: true },
+  )
+  if (categoryError && !isMissingCategoriesTable(categoryError)) throwIfError(categoryError)
+
   const { data, error } = await supabase.from('products').update({
     name: product.name,
     category: product.category,

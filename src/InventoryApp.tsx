@@ -23,13 +23,16 @@ import {
 import { GcashPage, SalesPage, TablePagination, TABLE_PAGE_SIZE, type GcashTransaction } from './SalesPages.tsx'
 import type { Movement, Product } from './types.ts'
 import {
+  addCategory as saveNewCategory,
   createProduct as saveNewProduct,
+  deleteCategory as removeCategory,
   deleteProduct as removeProduct,
   deleteMovement as removeMovement,
   deleteGcashRecord,
   importLegacyRecords,
   loadInventory,
   recordMovement as saveMovement,
+  renameCategory as saveRenamedCategory,
   saveGcashRecord,
   updateMovement as saveUpdatedMovement,
   updateProduct as saveUpdatedProduct,
@@ -38,7 +41,7 @@ import { supabase } from './lib/supabase.ts'
 import type { Session } from '@supabase/supabase-js'
 import './anita.css'
 
-type View = 'overview' | 'inventory' | 'activity' | 'sales' | 'gcash'
+type View = 'overview' | 'categories' | 'inventory' | 'activity' | 'sales' | 'gcash'
 type InventoryFilter = 'all' | 'low' | 'expiring'
 type Dialog = { type: 'product'; product?: Product } | { type: 'movement'; productId: string; movement: 'purchase' | 'sale' } | null
 type LegacyRecords = { products: Product[]; movements: Movement[]; gcashRecords: GcashTransaction[] }
@@ -98,12 +101,14 @@ function App() {
   const [products, setProducts] = useState<Product[]>([])
   const [movements, setMovements] = useState<Movement[]>([])
   const [gcashRecords, setGcashRecords] = useState<GcashTransaction[]>([])
+  const [categories, setCategories] = useState<string[]>([])
   const [view, setView] = useState<View>('overview')
   const [filter, setFilter] = useState<InventoryFilter>('all')
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [inventoryPage, setInventoryPage] = useState(1)
   const [activityPage, setActivityPage] = useState(1)
+  const [editingCategory, setEditingCategory] = useState<string | null>(null)
   const [dialog, setDialog] = useState<Dialog>(null)
   const [notice, setNotice] = useState('')
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
@@ -126,6 +131,7 @@ function App() {
           setProducts([])
           setMovements([])
           setGcashRecords([])
+          setCategories([])
           setLegacyRecords(null)
         }
       }
@@ -173,6 +179,10 @@ function App() {
       setProducts(data.products)
       setMovements(data.movements)
       setGcashRecords(data.gcashRecords)
+      setCategories(data.categories)
+      if (data.categorySetupRequired) {
+        setNotice('Run the updated supabase/schema.sql to enable category management. Existing inventory remains available.')
+      }
       setLegacyRecords(null)
       if (!data.products.length && !data.movements.length && !data.gcashRecords.length) {
         try {
@@ -196,6 +206,7 @@ function App() {
       setProducts([])
       setMovements([])
       setGcashRecords([])
+      setCategories([])
       setLegacyRecords(null)
       setNotice(`Could not load your records: ${error instanceof Error ? error.message : String(error)}`)
       setLoadedUserId(userId)
@@ -227,8 +238,6 @@ function App() {
   const pageProducts = visibleProducts.slice(pageStartIndex, pageStartIndex + TABLE_PAGE_SIZE)
   const firstVisibleItem = visibleProducts.length ? pageStartIndex + 1 : 0
   const lastVisibleItem = Math.min(pageStartIndex + TABLE_PAGE_SIZE, visibleProducts.length)
-  const categories = [...new Set(products.map((product) => product.category))].sort((left, right) => left.localeCompare(right))
-
   const orderedMovements = [...movements].sort((left, right) => right.date.localeCompare(left.date))
   const totalActivityPages = Math.max(1, Math.ceil(orderedMovements.length / TABLE_PAGE_SIZE))
   const currentActivityPage = Math.min(activityPage, totalActivityPages)
@@ -388,6 +397,7 @@ function App() {
       return
     }
     setProducts((current) => [product, ...current])
+    setCategories((current) => [...new Set([...current, product.category])].sort((left, right) => left.localeCompare(right)))
     if (openingMovement) {
       setMovements((current) => [openingMovement, ...current])
     }
@@ -418,6 +428,7 @@ function App() {
       return
     }
     setProducts((current) => current.map((product) => product.id === original.id ? updated : product))
+    setCategories((current) => [...new Set([...current, updated.category])].sort((left, right) => left.localeCompare(right)))
     setDialog(null)
     setNotice(`${updated.name} updated`)
   }
@@ -544,6 +555,77 @@ function App() {
     setNotice(`${product.name} and its stock activity records deleted`)
   }
 
+  async function addCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const formElement = event.currentTarget
+    const form = new FormData(formElement)
+    const name = String(form.get('categoryName')).trim()
+    if (!name) return
+    if (categories.some((category) => category.toLowerCase() === name.toLowerCase())) {
+      setNotice(`The category “${name}” already exists`)
+      return
+    }
+    try {
+      await saveNewCategory(name)
+    } catch (error) {
+      setNotice(`Could not add category: ${error instanceof Error ? error.message : String(error)}`)
+      return
+    }
+    setCategories((current) => [...current, name].sort((left, right) => left.localeCompare(right)))
+    formElement.reset()
+    setNotice(`${name} category added`)
+  }
+
+  async function renameCategory(event: FormEvent<HTMLFormElement>, oldName: string) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const newName = String(form.get('categoryName')).trim()
+    if (!newName) return
+    if (newName.toLowerCase() !== oldName.toLowerCase()
+      && categories.some((category) => category.toLowerCase() === newName.toLowerCase())) {
+      setNotice(`The category “${newName}” already exists`)
+      return
+    }
+    if (newName === oldName) {
+      setEditingCategory(null)
+      return
+    }
+    try {
+      await saveRenamedCategory(oldName, newName)
+    } catch (error) {
+      setNotice(`Could not rename category: ${error instanceof Error ? error.message : String(error)}`)
+      return
+    }
+    setCategories((current) => current.map((category) => category === oldName ? newName : category)
+      .sort((left, right) => left.localeCompare(right)))
+    setProducts((current) => current.map((product) => product.category === oldName
+      ? { ...product, category: newName }
+      : product))
+    if (categoryFilter === oldName) setCategoryFilter(newName)
+    setEditingCategory(null)
+    setNotice(`${oldName} renamed to ${newName}`)
+  }
+
+  async function deleteCategory(name: string) {
+    const matchingProducts = products.filter((product) => product.category === name)
+    const detail = matchingProducts.length
+      ? ` This will also permanently delete ${matchingProducts.length} ${matchingProducts.length === 1 ? 'product and its' : 'products and their'} stock activity records.`
+      : ''
+    if (!window.confirm(`Delete the “${name}” category?${detail} This cannot be undone.`)) return
+    try {
+      await removeCategory(name)
+    } catch (error) {
+      setNotice(`Could not delete category: ${error instanceof Error ? error.message : String(error)}`)
+      return
+    }
+    const productIds = new Set(matchingProducts.map((product) => product.id))
+    setCategories((current) => current.filter((category) => category !== name))
+    setProducts((current) => current.filter((product) => !productIds.has(product.id)))
+    setMovements((current) => current.filter((movement) => !productIds.has(movement.productId)))
+    if (categoryFilter === name) setCategoryFilter('all')
+    setNotice(`${name} category deleted`)
+  }
+
   return (
     <div className="app-shell">
       <aside className={`sidebar ${mobileNavOpen ? 'sidebar-open' : ''}`}>
@@ -554,6 +636,7 @@ function App() {
         <div className="side-label">WORKSPACE</div>
         <nav className="side-nav" aria-label="Main navigation">
           <button className={view === 'overview' ? 'nav-link active' : 'nav-link'} onClick={() => { setView('overview'); setMobileNavOpen(false) }}><LayoutDashboard size={18} />Overview</button>
+          <button className={view === 'categories' ? 'nav-link active' : 'nav-link'} onClick={() => { setView('categories'); setMobileNavOpen(false) }}><Boxes size={18} />Category<span className="nav-count">{categories.length}</span></button>
           <button className={view === 'inventory' ? 'nav-link active' : 'nav-link'} onClick={() => openInventory()}><Package size={18} />Inventory<span className="nav-count">{products.length}</span></button>
           <button className={view === 'activity' ? 'nav-link active' : 'nav-link'} onClick={() => { setView('activity'); setMobileNavOpen(false) }}><ArrowDownLeft size={18} />Stock activity</button>
           <button className={view === 'sales' ? 'nav-link active' : 'nav-link'} onClick={() => { setView('sales'); setMobileNavOpen(false) }}><TrendingUp size={18} />Sales</button>
@@ -573,7 +656,7 @@ function App() {
       <main className="main-area">
         <header className="topbar">
           <button className="mobile-menu icon-button" title="Open menu" onClick={() => setMobileNavOpen((open) => !open)}><Menu size={20} /></button>
-          <div className="breadcrumbs">Anita <span>/</span> <strong>{view === 'overview' ? 'Overview' : view === 'inventory' ? 'Inventory' : 'Stock activity'}</strong></div>
+          <div className="breadcrumbs">Anita <span>/</span> <strong>{view === 'overview' ? 'Overview' : view === 'categories' ? 'Category' : view === 'inventory' ? 'Inventory' : view === 'activity' ? 'Stock activity' : view === 'sales' ? 'Sales' : 'GCash'}</strong></div>
           <div className="topbar-actions">
             {!['sales', 'gcash'].includes(view) && <span className="today-label"><CalendarClock size={15} />{dateLabel(today)}</span>}
             <button className="button button-secondary export-button" onClick={exportWorkbook}><Download size={16} />Export Excel</button>
@@ -610,6 +693,39 @@ function App() {
               </div>
             </section>
             <div className="page-note"><span className="note-spark">?</span>Little by little, every shelf accounted for.</div>
+          </>}
+
+          {view === 'categories' && <>
+            <section className="page-heading inventory-heading">
+              <div><div className="eyebrow"><span className="eyebrow-line" />PRODUCT ORGANIZATION</div><h1>Categories.</h1><p>Add, rename, or remove product categories.</p></div>
+            </section>
+            <section className="panel category-manager">
+              <div className="panel-heading"><div><h2>Add a category</h2><p>Categories are shared across your product catalog.</p></div></div>
+              <form className="category-add-form" onSubmit={(event) => { void addCategory(event) }}>
+                <label className="field full-field">Category name<input name="categoryName" placeholder="e.g. Bakery" maxLength={80} required /></label>
+                <button className="button button-primary" type="submit"><Plus size={16} />Add category</button>
+              </form>
+              <div className="category-list-heading"><h2>Existing categories</h2><span className="record-count">{categories.length} categories</span></div>
+              {categories.length ? <div className="category-list">{categories.map((category) => {
+                const productCount = products.filter((product) => product.category === category).length
+                return <div className="category-row" key={category}>
+                  {editingCategory === category
+                    ? <form className="category-rename-form" onSubmit={(event) => { void renameCategory(event, category) }}>
+                      <label className="visually-hidden" htmlFor="rename-category">Category name</label>
+                      <input id="rename-category" name="categoryName" defaultValue={category} maxLength={80} required autoFocus />
+                      <button className="button button-primary" type="submit"><Check size={15} />Save</button>
+                      <button className="button button-secondary" type="button" onClick={() => setEditingCategory(null)}>Cancel</button>
+                    </form>
+                    : <>
+                      <div className="category-row-info"><strong>{category}</strong><span>{productCount} {productCount === 1 ? 'product' : 'products'}</span></div>
+                      <div className="row-actions">
+                        <button title={`Rename ${category}`} aria-label={`Rename ${category}`} onClick={() => setEditingCategory(category)}><Pencil size={14} /></button>
+                        <button className="category-delete-action" title={`Delete ${category}`} aria-label={`Delete ${category}`} onClick={() => { void deleteCategory(category) }}><Trash2 size={14} /></button>
+                      </div>
+                    </>}
+                </div>
+              })}</div> : <div className="empty-table"><Boxes size={24} /><strong>No categories yet</strong><span>Add a category to organize your inventory.</span></div>}
+            </section>
           </>}
 
           {view === 'inventory' && <>
