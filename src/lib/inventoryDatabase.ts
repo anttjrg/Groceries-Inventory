@@ -86,6 +86,12 @@ export async function updateProduct(product: Product) {
   if (!data) throw new Error('Product was not found or you do not have permission to update it')
 }
 
+export async function deleteProduct(id: string) {
+  const { data, error } = await supabase.from('products').delete().eq('id', id).select('id').maybeSingle()
+  throwIfError(error)
+  if (!data) throw new Error('Product was not found or you do not have permission to delete it')
+}
+
 export async function recordMovement(movement: Movement, expiryDate?: string) {
   const { error } = await supabase.rpc('record_stock_movement', {
     p_movement: { ...movement, expiryDate: expiryDate ?? '' },

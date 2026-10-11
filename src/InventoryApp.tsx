@@ -25,6 +25,7 @@ import { GcashPage, SalesPage, type GcashTransaction } from './SalesPages.tsx'
 import type { Movement, Product } from './types.ts'
 import {
   createProduct as saveNewProduct,
+  deleteProduct as removeProduct,
   deleteMovement as removeMovement,
   deleteGcashRecord,
   importLegacyRecords,
@@ -42,6 +43,8 @@ type View = 'overview' | 'inventory' | 'activity' | 'sales' | 'gcash'
 type InventoryFilter = 'all' | 'low' | 'expiring'
 type Dialog = { type: 'product'; product?: Product } | { type: 'movement'; productId: string; movement: 'purchase' | 'sale' } | null
 type LegacyRecords = { products: Product[]; movements: Movement[]; gcashRecords: GcashTransaction[] }
+const INVENTORY_PAGE_SIZE = 10
+const PRODUCT_PRICE_ERROR = 'Selling price must be higher than unit cost. Lower the unit cost or increase the selling price.'
 
 function readLegacyList<T>(key: string): T[] {
   const stored = localStorage.getItem(key)
@@ -90,6 +93,7 @@ function App() {
   const [filter, setFilter] = useState<InventoryFilter>('all')
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [inventoryPage, setInventoryPage] = useState(1)
   const [dialog, setDialog] = useState<Dialog>(null)
   const [notice, setNotice] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -187,6 +191,12 @@ function App() {
       || (filter === 'expiring' && daysUntil(product.expiryDate) <= 14)
     return matchesQuery && matchesCategory && matchesFilter
   })
+  const totalInventoryPages = Math.max(1, Math.ceil(visibleProducts.length / INVENTORY_PAGE_SIZE))
+  const currentInventoryPage = Math.min(inventoryPage, totalInventoryPages)
+  const pageStartIndex = (currentInventoryPage - 1) * INVENTORY_PAGE_SIZE
+  const pageProducts = visibleProducts.slice(pageStartIndex, pageStartIndex + INVENTORY_PAGE_SIZE)
+  const firstVisibleItem = visibleProducts.length ? pageStartIndex + 1 : 0
+  const lastVisibleItem = Math.min(pageStartIndex + INVENTORY_PAGE_SIZE, visibleProducts.length)
   const categories = [...new Set(products.map((product) => product.category))].sort((left, right) => left.localeCompare(right))
 
   const recentMovements = [...movements].sort((left, right) => right.date.localeCompare(left.date)).slice(0, 6)
@@ -314,6 +324,10 @@ function App() {
       reorderLevel: Number(form.get('reorderLevel')),
       expiryDate: String(form.get('expiryDate')),
     }
+    if (product.cost >= product.price) {
+      setNotice(PRODUCT_PRICE_ERROR)
+      return
+    }
     const openingMovement = product.quantity > 0 ? {
         id: makeId(), productId: product.id, productName: product.name, type: 'purchase',
         quantity: product.quantity, unitPrice: product.cost, date: today, note: 'Opening stock',
@@ -343,6 +357,10 @@ function App() {
       price: Number(form.get('price')),
       reorderLevel: Number(form.get('reorderLevel')),
       expiryDate: String(form.get('expiryDate')),
+    }
+    if (updated.cost >= updated.price) {
+      setNotice(PRODUCT_PRICE_ERROR)
+      return
     }
     try {
       await saveUpdatedProduct(updated)
@@ -389,6 +407,7 @@ function App() {
   }
 
   function openInventory(filterValue: InventoryFilter = 'all') {
+    setInventoryPage(1)
     setFilter(filterValue)
     setView('inventory')
     setMobileNavOpen(false)
@@ -463,6 +482,21 @@ function App() {
     setNotice('Stock activity deleted')
   }
 
+  async function deleteInventoryProduct(product: Product) {
+    if (!window.confirm(`Delete ${product.name} from inventory? Its stock activity history will be kept.`)) return
+    try {
+      await removeProduct(product.id)
+    } catch (error) {
+      setNotice(`Could not delete item: ${error instanceof Error ? error.message : String(error)}`)
+      return
+    }
+    setProducts((current) => current.filter((item) => item.id !== product.id))
+    setMovements((current) => current.map((movement) => movement.productId === product.id
+      ? { ...movement, productId: '' }
+      : movement))
+    setNotice(`${product.name} deleted from inventory`)
+  }
+
   return (
     <div className="app-shell">
       <aside className={`sidebar ${mobileNavOpen ? 'sidebar-open' : ''}`}>
@@ -504,7 +538,7 @@ function App() {
           {view === 'overview' && <>
             <section className="page-heading">
               <div><div className="eyebrow"><span className="eyebrow-line" />YOUR STORE, IN GOOD ORDER</div><h1>Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}.</h1><p>A clear view of what is on your shelves today.</p></div>
-              <button className="button button-soft" onClick={() => { setView('inventory'); setFilter('all') }}><Boxes size={16} />View inventory<ArrowUpRight size={15} /></button>
+              <button className="button button-soft" onClick={() => { setInventoryPage(1); setView('inventory'); setFilter('all') }}><Boxes size={16} />View inventory<ArrowUpRight size={15} /></button>
             </section>
 
             <section className="metric-grid" aria-label="Inventory summary">
@@ -519,7 +553,7 @@ function App() {
 
             <section className="dashboard-columns">
               <div className="panel inventory-panel">
-                <div className="panel-heading"><div><h2>Stock overview</h2><p>The items that need your eye first.</p></div><button className="text-link" onClick={() => { setView('inventory'); setFilter('all') }}>All items <ArrowUpRight size={14} /></button></div>
+                <div className="panel-heading"><div><h2>Stock overview</h2><p>The items that need your eye first.</p></div><button className="text-link" onClick={() => { setInventoryPage(1); setView('inventory'); setFilter('all') }}>All items <ArrowUpRight size={14} /></button></div>
                 {products.length ? <div className="stock-list">{[...products].sort((a, b) => Number(a.quantity > a.reorderLevel) - Number(b.quantity > b.reorderLevel)).slice(0, 5).map((product) => <StockRow key={product.id} product={product} onReceive={() => setDialog({ type: 'movement', productId: product.id, movement: 'purchase' })} />)}</div> : <EmptyState title="Your shelves are waiting" detail="Add your first grocery item to begin tracking stock." action="Add first item" onAction={() => setDialog({ type: 'product' })} />}
               </div>
               <div className="panel activity-panel">
@@ -532,10 +566,11 @@ function App() {
 
           {view === 'inventory' && <>
             <section className="page-heading inventory-heading"><div><div className="eyebrow"><span className="eyebrow-line" />PRODUCT CATALOG</div><h1>Your inventory.</h1><p>Keep quantities, prices and best-before dates up to date.</p></div><button className="button button-primary" onClick={() => setDialog({ type: 'product' })}><Plus size={17} />Add item</button></section>
-            <div className="inventory-toolbar"><div className="inventory-search-controls"><div className="search-box"><Search size={17} /><input aria-label="Search inventory" placeholder="Search items or categories..." value={query} onChange={(event) => setQuery(event.target.value)} /><kbd>/</kbd></div><label className="category-filter"><span>Category</span><select aria-label="Filter by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">All categories</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select><ChevronDown size={14} /></label></div><div className="filter-tabs" role="group" aria-label="Filter inventory">{(['all', 'low', 'expiring'] as InventoryFilter[]).map((filterOption) => <button key={filterOption} className={filter === filterOption ? 'filter-tab selected' : 'filter-tab'} onClick={() => setFilter(filterOption)}>{filterOption === 'all' ? 'All items' : filterOption === 'low' ? `Low stock = ${lowStock.length}` : `Expiring = ${expiring.length}`}</button>)}</div></div>
-            <div className="panel table-panel"><div className="table-summary"><span><strong>{visibleProducts.length}</strong> {visibleProducts.length === 1 ? 'item' : 'items'} shown</span><span className="table-summary-right">Prices in your local currency</span></div>
-              <div className="table-scroll"><table className="inventory-table"><thead><tr><th>ITEM</th><th>ON HAND</th><th>UNIT COST</th><th>SELL PRICE</th><th>EXPIRATION</th><th>STATUS</th><th><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{visibleProducts.map((product) => <InventoryTableRow key={product.id} product={product} onReceive={() => setDialog({ type: 'movement', productId: product.id, movement: 'purchase' })} onSell={() => setDialog({ type: 'movement', productId: product.id, movement: 'sale' })} onEdit={() => setDialog({ type: 'product', product })} />)}</tbody></table></div>
+            <div className="inventory-toolbar"><div className="inventory-search-controls"><div className="search-box"><Search size={17} /><input aria-label="Search inventory" placeholder="Search items or categories..." value={query} onChange={(event) => { setInventoryPage(1); setQuery(event.target.value) }} /><kbd>/</kbd></div><label className="category-filter"><span>Category</span><select aria-label="Filter by category" value={categoryFilter} onChange={(event) => { setInventoryPage(1); setCategoryFilter(event.target.value) }}><option value="all">All categories</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select><ChevronDown size={14} /></label></div><div className="filter-tabs" role="group" aria-label="Filter inventory">{(['all', 'low', 'expiring'] as InventoryFilter[]).map((filterOption) => <button key={filterOption} className={filter === filterOption ? 'filter-tab selected' : 'filter-tab'} onClick={() => { setInventoryPage(1); setFilter(filterOption) }}>{filterOption === 'all' ? 'All items' : filterOption === 'low' ? `Low stock = ${lowStock.length}` : `Expiring = ${expiring.length}`}</button>)}</div></div>
+            <div className="panel table-panel"><div className="table-summary"><span>Showing <strong>{firstVisibleItem}-{lastVisibleItem}</strong> of <strong>{visibleProducts.length}</strong> items</span><span className="table-summary-right">Prices in your local currency</span></div>
+              <div className="table-scroll"><table className="inventory-table"><thead><tr><th>ITEM</th><th>ON HAND</th><th>UNIT COST</th><th>SELL PRICE</th><th>EXPIRATION</th><th>STATUS</th><th><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{pageProducts.map((product) => <InventoryTableRow key={product.id} product={product} onReceive={() => setDialog({ type: 'movement', productId: product.id, movement: 'purchase' })} onSell={() => setDialog({ type: 'movement', productId: product.id, movement: 'sale' })} onEdit={() => setDialog({ type: 'product', product })} onDelete={() => { void deleteInventoryProduct(product) }} />)}</tbody></table></div>
               {!visibleProducts.length && <div className="empty-table"><Package size={24} /><strong>No matching items</strong><span>Try another search or add a product.</span></div>}
+              {totalInventoryPages > 1 && <nav className="inventory-pagination" aria-label="Inventory pages"><span>Page {currentInventoryPage} of {totalInventoryPages}</span><div><button type="button" className="button button-secondary" onClick={() => setInventoryPage(currentInventoryPage - 1)} disabled={currentInventoryPage === 1}>Previous</button><button type="button" className="button button-secondary" onClick={() => setInventoryPage(currentInventoryPage + 1)} disabled={currentInventoryPage === totalInventoryPages}>Next</button></div></nav>}
             </div>
           </>}
 
@@ -607,19 +642,39 @@ function ProductDialog({ product, onClose, onSubmit }: {
   onClose: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
 }) {
+  const [priceError, setPriceError] = useState('')
   const units = ['piece', 'pack', 'bottle', 'box', 'kg', 'g', 'liter', 'tray', 'loaf', 'cup']
+  function validatePrice(form: HTMLFormElement) {
+    const values = new FormData(form)
+    const cost = String(values.get('cost') ?? '').trim()
+    const price = String(values.get('price') ?? '').trim()
+    const error = cost && price && Number(cost) >= Number(price) ? PRODUCT_PRICE_ERROR : ''
+    setPriceError(error)
+    return !error
+  }
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    if (!validatePrice(event.currentTarget)) {
+      event.preventDefault()
+      return
+    }
+    onSubmit(event)
+  }
+  function handlePriceChange(form: HTMLFormElement | null) {
+    if (form) validatePrice(form)
+  }
   return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
     <section className="modal" role="dialog" aria-modal="true" aria-labelledby="product-modal-title">
       <div className="modal-heading"><div><div className="eyebrow"><span className="eyebrow-line" />{product ? 'EDIT PRODUCT' : 'NEW PRODUCT'}</div><h2 id="product-modal-title">{product ? 'Edit item' : 'Add an item'}</h2><p>{product ? 'Update item details. Use stock actions to change quantity.' : 'Set up its shelf details and starting quantity.'}</p></div><button type="button" className="icon-button" title="Close" onClick={onClose}><X size={19} /></button></div>
-      <form onSubmit={onSubmit}>
+      <form onSubmit={handleSubmit}>
         <div className="form-grid">
           <label className="field full-field">Item name<input name="name" defaultValue={product?.name} placeholder="e.g. Whole wheat bread" required autoFocus /></label>
           <label className="field">Category<input name="category" defaultValue={product?.category} placeholder="e.g. Bakery" /></label>
           <label className="field">Unit<select name="unit" defaultValue={product?.unit ?? 'piece'}>{!units.includes(product?.unit ?? '') && product?.unit && <option value={product.unit}>{product.unit}</option>}{units.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select><ChevronDown className="select-chevron" size={14} /></label>
           {product ? <label className="field">On hand<input value={`${product.quantity} ${product.unit}`} readOnly /><span className="field-hint">Change with Receive or Sell.</span></label> : <label className="field">Starting quantity<input name="quantity" type="number" min="0" step="any" defaultValue="0" required /></label>}
           <label className="field">Reorder when at<input name="reorderLevel" type="number" min="0" step="any" defaultValue={product?.reorderLevel ?? 5} required /></label>
-          <label className="field">Unit cost<input name="cost" type="number" min="0" step="0.01" defaultValue={product?.cost} placeholder="0.00" required /></label>
-          <label className="field">Selling price<input name="price" type="number" min="0" step="0.01" defaultValue={product?.price} placeholder="0.00" required /></label>
+          <label className="field">Unit cost<input name="cost" type="number" min="0" step="0.01" defaultValue={product?.cost} placeholder="0.00" required aria-invalid={Boolean(priceError)} aria-describedby={priceError ? 'product-price-error' : undefined} onChange={(event) => handlePriceChange(event.currentTarget.form)} /></label>
+          <label className="field">Selling price<input name="price" type="number" min="0" step="0.01" defaultValue={product?.price} placeholder="0.00" required aria-invalid={Boolean(priceError)} aria-describedby={priceError ? 'product-price-error' : undefined} onChange={(event) => handlePriceChange(event.currentTarget.form)} /></label>
+          {priceError && <p className="price-validation-error" id="product-price-error" role="alert">{priceError}</p>}
           <label className="field full-field">Expiration date <span className="optional-label">optional</span><input name="expiryDate" type="date" defaultValue={product?.expiryDate} /></label>
         </div>
         <div className="modal-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button type="submit" className="button button-primary">{product ? <Check size={15} /> : <Plus size={16} />}{product ? 'Save changes' : 'Save item'}</button></div>
@@ -633,11 +688,11 @@ function StockRow({ product, onReceive }: { product: Product; onReceive: () => v
   return <div className="stock-row"><span className={`product-avatar avatar-${product.category.toLowerCase().replace(/[^a-z]/g, '')}`}>{product.name.slice(0, 1).toUpperCase()}</span><div className="stock-product"><strong>{product.name}</strong><span>{product.category}</span></div><div className="stock-quantity"><strong>{product.quantity}</strong><span>{product.unit} on hand</span></div><span className={isLow ? 'stock-pill low' : 'stock-pill healthy'}>{isLow ? 'Low stock' : 'In stock'}</span><button className="receive-quick" title={`Receive ${product.name}`} onClick={onReceive}><Plus size={15} /></button></div>
 }
 
-function InventoryTableRow({ product, onReceive, onSell, onEdit }: { product: Product; onReceive: () => void; onSell: () => void; onEdit: () => void }) {
+function InventoryTableRow({ product, onReceive, onSell, onEdit, onDelete }: { product: Product; onReceive: () => void; onSell: () => void; onEdit: () => void; onDelete: () => void }) {
   const expiryDays = daysUntil(product.expiryDate)
   const isLow = product.quantity <= product.reorderLevel
   const expiryLabel = !product.expiryDate ? 'Not set' : expiryDays < 0 ? 'Expired' : expiryDays === 0 ? 'Today' : expiryDays <= 14 ? `${expiryDays} days` : dateLabel(product.expiryDate)
-  return <tr><td><div className="table-item"><span className={`product-avatar avatar-${product.category.toLowerCase().replace(/[^a-z]/g, '')}`}>{product.name.slice(0, 1).toUpperCase()}</span><div><strong className="item-name">{product.name}</strong><span className="subline">{product.category}</span></div></div></td><td><strong>{product.quantity}</strong><span className="subline">{product.unit}</span></td><td>{money(product.cost)}</td><td>{money(product.price)}</td><td><span className={expiryDays <= 14 ? 'expiry-text soon' : 'expiry-text'}>{expiryDays <= 14 && <Clock3 size={13} />}{expiryLabel}</span></td><td><span className={isLow ? 'stock-pill low' : 'stock-pill healthy'}><span />{isLow ? 'Low' : 'Healthy'}</span></td><td><div className="row-actions inventory-row-actions"><button className="inventory-action" onClick={onReceive}>Restock</button><button className="inventory-action sell-action" onClick={onSell} disabled={!product.quantity}>Sold</button><button className="inventory-edit-action" title={`Edit ${product.name}`} aria-label={`Edit ${product.name}`} onClick={onEdit}><Pencil size={14} /></button></div></td></tr>
+  return <tr><td><div className="table-item"><span className={`product-avatar avatar-${product.category.toLowerCase().replace(/[^a-z]/g, '')}`}>{product.name.slice(0, 1).toUpperCase()}</span><div><strong className="item-name">{product.name}</strong><span className="subline">{product.category}</span></div></div></td><td><strong>{product.quantity}</strong><span className="subline">{product.unit}</span></td><td>{money(product.cost)}</td><td>{money(product.price)}</td><td><span className={expiryDays <= 14 ? 'expiry-text soon' : 'expiry-text'}>{expiryDays <= 14 && <Clock3 size={13} />}{expiryLabel}</span></td><td><span className={isLow ? 'stock-pill low' : 'stock-pill healthy'}><span />{isLow ? 'Low' : 'Healthy'}</span></td><td><div className="row-actions inventory-row-actions"><button className="inventory-action" onClick={onReceive}>Restock</button><button className="inventory-action sell-action" onClick={onSell} disabled={!product.quantity}>Sold</button><button className="inventory-edit-action" title={`Edit ${product.name}`} aria-label={`Edit ${product.name}`} onClick={onEdit}><Pencil size={14} /></button><button className="inventory-edit-action inventory-delete-action" title={`Delete ${product.name}`} aria-label={`Delete ${product.name}`} onClick={onDelete}><Trash2 size={14} /></button></div></td></tr>
 }
 
 function ActivityRow({ movement }: { movement: Movement }) {
