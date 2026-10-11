@@ -1796,9 +1796,18 @@ button.metric-card:hover {
 }
 
 @media (max-width: 850px) and (min-width: 621px) {
-    .storage-indicator,
-    .sidebar-bottom .app-install-button {
+    .storage-indicator {
         display: none;
+    }
+
+    .sidebar-bottom .sign-out-button {
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 40px;
+        margin: 12px 0 0;
+        font-size: 0;
+        display: flex;
     }
 }
 
