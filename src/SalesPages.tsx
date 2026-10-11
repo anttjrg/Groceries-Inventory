@@ -7,6 +7,7 @@ export type GcashTransaction = { id: string; date: string; service: string; amou
 type Period = 'day' | 'week' | 'month' | 'year'
 type DateRange = { start: string; end: string }
 const services = ['Cash in', 'Cash out', 'Load', 'Bills payment', 'Payment']
+export const TABLE_PAGE_SIZE = 10
 
 function todayString(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -37,6 +38,25 @@ function formatRange(range: DateRange, period: Period) {
 }
 function newId() { return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}` }
 
+export function TablePagination({ itemCount, page, onPageChange, label }: {
+  itemCount: number
+  page: number
+  onPageChange: (page: number) => void
+  label: string
+}) {
+  const pageCount = Math.ceil(itemCount / TABLE_PAGE_SIZE)
+  if (pageCount < 2) return null
+  const firstItem = (page - 1) * TABLE_PAGE_SIZE + 1
+  const lastItem = Math.min(page * TABLE_PAGE_SIZE, itemCount)
+  return <nav className="inventory-pagination" aria-label={`${label} pages`}>
+    <span>Showing {firstItem}-{lastItem} of {itemCount} · Page {page} of {pageCount}</span>
+    <div>
+      <button type="button" className="button button-secondary" onClick={() => onPageChange(page - 1)} disabled={page === 1}>Previous</button>
+      <button type="button" className="button button-secondary" onClick={() => onPageChange(page + 1)} disabled={page === pageCount}>Next</button>
+    </div>
+  </nav>
+}
+
 function PeriodPicker({ period, setPeriod, date, setDate }: { period: Period; setPeriod: (value: Period) => void; date: string; setDate: (value: string) => void }) {
   const range = rangeFor(date, period)
   const dateInputRef = useRef<HTMLInputElement>(null)
@@ -51,8 +71,12 @@ function PeriodPicker({ period, setPeriod, date, setDate }: { period: Period; se
 
 export function SalesPage({ sales, onEdit, onDelete }: { sales: SaleRecord[]; onEdit: (id: string) => void; onDelete: (id: string) => void }) {
   const [period, setPeriod] = useState<Period>('day'), [date, setDate] = useState(todayString())
+  const [page, setPage] = useState(1)
   const range = rangeFor(date, period)
   const rows = sales.filter((sale) => sale.date >= range.start && sale.date <= range.end).sort((a, b) => b.date.localeCompare(a.date))
+  const pageCount = Math.max(1, Math.ceil(rows.length / TABLE_PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const pageRows = rows.slice((currentPage - 1) * TABLE_PAGE_SIZE, currentPage * TABLE_PAGE_SIZE)
   const total = rows.reduce((sum, sale) => sum + sale.quantity * sale.unitPrice, 0)
   const costTotal = rows.reduce((sum, sale) => sum + sale.quantity * sale.unitCost, 0)
   const profitTotal = total - costTotal
@@ -66,10 +90,10 @@ export function SalesPage({ sales, onEdit, onDelete }: { sales: SaleRecord[]; on
   })
   return <>
     <section className="page-heading inventory-heading"><div><div className="eyebrow"><span className="eyebrow-line" />GROCERY SALES</div><h1>Sales, by the day.</h1><p>Review sales for a day, week, month or year.</p></div></section>
-    <PeriodPicker period={period} setPeriod={setPeriod} date={date} setDate={setDate} />
+    <PeriodPicker period={period} setPeriod={(value) => { setPeriod(value); setPage(1) }} date={date} setDate={(value) => { setDate(value); setPage(1) }} />
     <section className="sales-summary-grid"><article className="sales-summary-card"><span>Total selling price</span><strong>{amountText(total)}</strong><small>Sales recorded this {period}</small></article><article className="sales-summary-card"><span>Total cost</span><strong>{amountText(costTotal)}</strong><small>Cost of goods sold</small></article><article className="sales-summary-card profit-card"><span>Gross profit</span><strong>{amountText(profitTotal)}</strong><small>Selling price less cost</small></article><article className="sales-summary-card"><span>Units sold</span><strong>{units}</strong><small>Across {rows.length} sale {rows.length === 1 ? 'record' : 'records'}</small></article></section>
     {period !== 'day' && <section className="panel daily-breakdown"><div className="panel-heading"><div><h2>{period === 'year' ? 'Sales by month' : 'Sales by day'}</h2><p>{period === 'year' ? 'Monthly cost, sales and profit for this year.' : `Cost, sales and profit by day this ${period}.`}</p></div></div>{daily.size ? <div className="table-scroll"><table className="inventory-table daily-summary-table sales-daily-table"><thead><tr><th>{period === 'year' ? 'MONTH' : 'DATE'}</th><th>SALE RECORDS</th><th>TOTAL COST</th><th>TOTAL SELLING PRICE</th><th>GROSS PROFIT</th></tr></thead><tbody>{[...daily].sort(([a], [b]) => b.localeCompare(a)).map(([day, sum]) => <tr key={day}><td>{period === 'year' ? dateText(`${day}-01`, { month: 'long', year: 'numeric' }) : dateText(day, { weekday: 'short', month: 'short', day: 'numeric' })}</td><td>{sum.count}</td><td>{amountText(sum.costs)}</td><td>{amountText(sum.sales)}</td><td><strong>{amountText(sum.sales - sum.costs)}</strong></td></tr>)}</tbody><tfoot><tr><td colSpan={2}>Total this {period}</td><td>{amountText(costTotal)}</td><td>{amountText(total)}</td><td>{amountText(profitTotal)}</td></tr></tfoot></table></div> : <div className="empty-table"><CalendarDays size={23} /><strong>No sales in this period</strong><span>Inventory sales will be totaled here.</span></div>}</section>}
-    <section className="panel sales-record-panel"><div className="panel-heading"><div><h2>Sale records</h2><p>Unit cost and selling price per item.</p></div><span className="record-count">{rows.length} records</span></div>{rows.length ? <div className="table-scroll"><table className="inventory-table sales-table"><thead><tr><th>DATE</th><th>ITEM</th><th>QUANTITY</th><th>UNIT COST</th><th>SELL PRICE</th><th>GROSS PROFIT</th><th><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{rows.map((sale) => { const saleCost = sale.quantity * sale.unitCost; const saleTotal = sale.quantity * sale.unitPrice; return <tr key={sale.id}><td>{dateText(sale.date)}</td><td><strong className="item-name">{sale.productName}</strong><span className="subline">{sale.note}</span></td><td>{sale.quantity}</td><td>{amountText(sale.unitCost)}</td><td>{amountText(sale.unitPrice)}</td><td className="profit-value">{amountText(saleTotal - saleCost)}</td><td><div className="row-actions"><button title="Edit sale" onClick={() => onEdit(sale.id)}><Pencil size={14} /></button><button title="Delete sale" onClick={() => onDelete(sale.id)}><Trash2 size={14} /></button></div></td></tr>})}</tbody><tfoot><tr><td colSpan={3}>Period totals</td><td>{amountText(costTotal)}</td><td>{amountText(total)}</td><td>{amountText(profitTotal)}</td><td /></tr></tfoot></table></div> : <div className="empty-table"><CalendarDays size={23} /><strong>No sales for this date</strong><span>Record an item sale to see it here.</span></div>}</section>
+    <section className="panel sales-record-panel"><div className="panel-heading"><div><h2>Sale records</h2><p>Unit cost and selling price per item.</p></div><span className="record-count">{rows.length} records</span></div>{rows.length ? <><div className="table-scroll"><table className="inventory-table sales-table"><thead><tr><th>DATE</th><th>ITEM</th><th>QUANTITY</th><th>UNIT COST</th><th>SELL PRICE</th><th>GROSS PROFIT</th><th><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{pageRows.map((sale) => { const saleCost = sale.quantity * sale.unitCost; const saleTotal = sale.quantity * sale.unitPrice; return <tr key={sale.id}><td>{dateText(sale.date)}</td><td><strong className="item-name">{sale.productName}</strong><span className="subline">{sale.note}</span></td><td>{sale.quantity}</td><td>{amountText(sale.unitCost)}</td><td>{amountText(sale.unitPrice)}</td><td className="profit-value">{amountText(saleTotal - saleCost)}</td><td><div className="row-actions"><button title="Edit sale" onClick={() => onEdit(sale.id)}><Pencil size={14} /></button><button title="Delete sale" onClick={() => onDelete(sale.id)}><Trash2 size={14} /></button></div></td></tr>})}</tbody><tfoot><tr><td colSpan={3}>Period totals</td><td>{amountText(costTotal)}</td><td>{amountText(total)}</td><td>{amountText(profitTotal)}</td><td /></tr></tfoot></table></div><TablePagination itemCount={rows.length} page={currentPage} onPageChange={setPage} label="Sales" /></> : <div className="empty-table"><CalendarDays size={23} /><strong>No sales for this date</strong><span>Record an item sale to see it here.</span></div>}</section>
   </>
 }
 
@@ -79,10 +103,14 @@ export function GcashPage({ records, onSave, onDelete }: {
   onDelete: (id: string) => Promise<void>
 }) {
   const [period, setPeriod] = useState<Period>('day'), [date, setDate] = useState(todayString()), [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
   const [editing, setEditing] = useState<GcashTransaction | null>(null), [adding, setAdding] = useState(false)
   const [saveError, setSaveError] = useState('')
   const range = rangeFor(date, period), selected = records.filter((row) => row.date >= range.start && row.date <= range.end)
   const rows = selected.filter((row) => `${row.customerName} ${row.phoneNumber} ${row.reference} ${row.service}`.toLowerCase().includes(query.toLowerCase())).sort((a, b) => b.date.localeCompare(a.date))
+  const pageCount = Math.max(1, Math.ceil(rows.length / TABLE_PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const pageRows = rows.slice((currentPage - 1) * TABLE_PAGE_SIZE, currentPage * TABLE_PAGE_SIZE)
   const volume = selected.reduce((sum, row) => sum + row.amount, 0), fees = selected.reduce((sum, row) => sum + row.fee, 0)
   const daily = new Map<string, { volume: number; fees: number; count: number }>()
   selected.forEach((row) => { const key = period === 'year' ? row.date.slice(0, 7) : row.date; const item = daily.get(key) ?? { volume: 0, fees: 0, count: 0 }; item.volume += row.amount; item.fees += row.fee; item.count += 1; daily.set(key, item) })
@@ -109,7 +137,7 @@ export function GcashPage({ records, onSave, onDelete }: {
 
   return <>
     <section className="page-heading inventory-heading"><div><div className="eyebrow"><span className="eyebrow-line" />GCASH SERVICES</div><h1>GCash, accounted for.</h1><p>Track cash-in, cash-out, load and bill payments with their fees.</p></div><button className="button button-primary" onClick={() => setAdding(true)}><Plus size={16} />Add GCash transaction</button></section>
-    <PeriodPicker period={period} setPeriod={setPeriod} date={date} setDate={setDate} />
+    <PeriodPicker period={period} setPeriod={(value) => { setPeriod(value); setPage(1) }} date={date} setDate={(value) => { setDate(value); setPage(1) }} />
     <section className="sales-summary-grid"><article className="sales-summary-card"><span>Transaction amount</span><strong>{amountText(volume)}</strong><small>Money processed this {period}</small></article><article className="sales-summary-card fee-card"><span>Fees collected</span><strong>{amountText(fees)}</strong><small>Your fees this {period}</small></article><article className="sales-summary-card collected-card"><span>Amount + fees</span><strong>{amountText(volume + fees)}</strong><small>{selected.length} GCash transactions</small></article></section>
     <section className="panel gcash-summary-panel">
       <div className="panel-heading"><div><h2>Period totals</h2><p>GCash amounts and fees for this {period}.</p></div></div>
@@ -123,7 +151,7 @@ export function GcashPage({ records, onSave, onDelete }: {
       </table></div>
     </section>
     {period !== 'day' && <section className="panel daily-breakdown"><div className="panel-heading"><div><h2>{period === 'year' ? 'GCash by month' : 'Daily GCash totals'}</h2><p>{period === 'year' ? 'Monthly amounts and fees this year.' : `Transaction amounts and fees by day this ${period}.`}</p></div></div>{daily.size ? <div className="table-scroll"><table className="inventory-table daily-summary-table gcash-daily-table"><thead><tr><th>{period === 'year' ? 'MONTH' : 'DATE'}</th><th>TRANSACTIONS</th><th>AMOUNT</th><th>FEES</th><th>COLLECTED</th></tr></thead><tbody>{[...daily].sort(([a], [b]) => b.localeCompare(a)).map(([day, sum]) => <tr key={day}><td>{period === 'year' ? dateText(`${day}-01`, { month: 'long', year: 'numeric' }) : dateText(day, { weekday: 'short', month: 'short', day: 'numeric' })}</td><td>{sum.count}</td><td>{amountText(sum.volume)}</td><td>{amountText(sum.fees)}</td><td><strong>{amountText(sum.volume + sum.fees)}</strong></td></tr>)}</tbody><tfoot><tr><td colSpan={2}>Total this {period}</td><td>{amountText(volume)}</td><td>{amountText(fees)}</td><td>{amountText(volume + fees)}</td></tr></tfoot></table></div> : <div className="empty-table"><CalendarDays size={23} /><strong>No GCash transactions this {period}</strong><span>Add a GCash transaction to start a record.</span></div>}</section>}
-    <section className="panel sales-record-panel gcash-record-panel"><div className="panel-heading gcash-table-heading"><div><h2>Transaction records</h2><p>{rows.length} of {selected.length} records in this period.</p></div><label className="search-box gcash-search"><Search size={15} /><input aria-label="Search GCash transactions" placeholder="Name, number or reference" value={query} onChange={(event) => setQuery(event.target.value)} /></label></div>{rows.length ? <div className="table-scroll"><table className="inventory-table gcash-table"><thead><tr><th>DATE</th><th>SERVICE</th><th>CUSTOMER</th><th>NUMBER</th><th>REFERENCE</th><th>AMOUNT</th><th>FEE</th><th><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td>{dateText(row.date, { month: 'short', day: 'numeric' })}</td><td><span className="service-tag">{row.service}</span></td><td>{row.customerName || '-'}</td><td>{row.phoneNumber || '-'}</td><td>{row.reference || '-'}</td><td>{amountText(row.amount)}</td><td>{amountText(row.fee)}</td><td><div className="row-actions"><button title="Edit transaction" onClick={() => setEditing(row)}><Pencil size={14} /></button><button title="Delete transaction" onClick={() => remove(row)}><Trash2 size={14} /></button></div></td></tr>)}</tbody><tfoot><tr><td colSpan={5}>Period totals</td><td>{amountText(volume)}</td><td>{amountText(fees)}</td><td /></tr></tfoot></table></div> : <div className="empty-table"><Wallet size={24} /><strong>{query ? 'No matching transactions' : 'No GCash records this day'}</strong><span>{query ? 'Search another name, number or reference.' : 'Add a GCash transaction to begin tracking.'}</span>{!query && <button className="button button-secondary" onClick={() => setAdding(true)}><Plus size={15} />Add transaction</button>}</div>}</section>
+    <section className="panel sales-record-panel gcash-record-panel"><div className="panel-heading gcash-table-heading"><div><h2>Transaction records</h2><p>{rows.length} of {selected.length} records in this period.</p></div><label className="search-box gcash-search"><Search size={15} /><input aria-label="Search GCash transactions" placeholder="Name, number or reference" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} /></label></div>{rows.length ? <><div className="table-scroll"><table className="inventory-table gcash-table"><thead><tr><th>DATE</th><th>SERVICE</th><th>CUSTOMER</th><th>NUMBER</th><th>REFERENCE</th><th>AMOUNT</th><th>FEE</th><th><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{pageRows.map((row) => <tr key={row.id}><td>{dateText(row.date, { month: 'short', day: 'numeric' })}</td><td><span className="service-tag">{row.service}</span></td><td>{row.customerName || '-'}</td><td>{row.phoneNumber || '-'}</td><td>{row.reference || '-'}</td><td>{amountText(row.amount)}</td><td>{amountText(row.fee)}</td><td><div className="row-actions"><button title="Edit transaction" onClick={() => setEditing(row)}><Pencil size={14} /></button><button title="Delete transaction" onClick={() => remove(row)}><Trash2 size={14} /></button></div></td></tr>)}</tbody><tfoot><tr><td colSpan={5}>Period totals</td><td>{amountText(volume)}</td><td>{amountText(fees)}</td><td /></tr></tfoot></table></div><TablePagination itemCount={rows.length} page={currentPage} onPageChange={setPage} label="GCash" /></> : <div className="empty-table"><Wallet size={24} /><strong>{query ? 'No matching transactions' : 'No GCash records this day'}</strong><span>{query ? 'Search another name, number or reference.' : 'Add a GCash transaction to begin tracking.'}</span>{!query && <button className="button button-secondary" onClick={() => setAdding(true)}><Plus size={15} />Add transaction</button>}</div>}</section>
     {saveError && <p className="auth-error" role="alert">{saveError}</p>}
     {(adding || editing) && <GcashDialog record={editing} error={saveError} onClose={() => { setAdding(false); setEditing(null); setSaveError('') }} onSubmit={save} />}
   </>

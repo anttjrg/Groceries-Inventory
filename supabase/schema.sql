@@ -213,6 +213,26 @@ begin
 end;
 $$;
 
+create or replace function public.delete_product_with_activity(p_product_id text)
+returns void
+language plpgsql
+as $$
+declare
+  v_product public.products%rowtype;
+begin
+  select * into v_product from public.products
+  where id = p_product_id and user_id = auth.uid()
+  for update;
+  if not found then raise exception 'Product not found'; end if;
+
+  delete from public.movements
+  where product_id = v_product.id and user_id = auth.uid();
+
+  delete from public.products
+  where id = v_product.id and user_id = auth.uid();
+end;
+$$;
+
 create or replace function public.import_legacy_records(
   p_products jsonb,
   p_movements jsonb,
@@ -277,8 +297,10 @@ revoke all on function public.create_product_with_opening_stock(jsonb, jsonb) fr
 revoke all on function public.record_stock_movement(jsonb) from public, anon;
 revoke all on function public.update_stock_movement(jsonb) from public, anon;
 revoke all on function public.delete_stock_movement(text) from public, anon;
+revoke all on function public.delete_product_with_activity(text) from public, anon;
 grant execute on function public.create_product_with_opening_stock(jsonb, jsonb) to authenticated;
 grant execute on function public.record_stock_movement(jsonb) to authenticated;
 grant execute on function public.update_stock_movement(jsonb) to authenticated;
 grant execute on function public.delete_stock_movement(text) to authenticated;
+grant execute on function public.delete_product_with_activity(text) to authenticated;
 grant execute on function public.import_legacy_records(jsonb, jsonb, jsonb) to authenticated;

@@ -87,9 +87,10 @@ export async function updateProduct(product: Product) {
 }
 
 export async function deleteProduct(id: string) {
-  const { data, error } = await supabase.from('products').delete().eq('id', id).select('id').maybeSingle()
+  const { error } = await supabase.rpc('delete_product_with_activity', {
+    p_product_id: id,
+  })
   throwIfError(error)
-  if (!data) throw new Error('Product was not found or you do not have permission to delete it')
 }
 
 export async function recordMovement(movement: Movement, expiryDate?: string) {

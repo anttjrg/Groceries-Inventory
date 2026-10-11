@@ -21,7 +21,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { GcashPage, SalesPage, type GcashTransaction } from './SalesPages.tsx'
+import { GcashPage, SalesPage, TablePagination, TABLE_PAGE_SIZE, type GcashTransaction } from './SalesPages.tsx'
 import type { Movement, Product } from './types.ts'
 import {
   createProduct as saveNewProduct,
@@ -43,7 +43,6 @@ type View = 'overview' | 'inventory' | 'activity' | 'sales' | 'gcash'
 type InventoryFilter = 'all' | 'low' | 'expiring'
 type Dialog = { type: 'product'; product?: Product } | { type: 'movement'; productId: string; movement: 'purchase' | 'sale' } | null
 type LegacyRecords = { products: Product[]; movements: Movement[]; gcashRecords: GcashTransaction[] }
-const INVENTORY_PAGE_SIZE = 10
 const PRODUCT_PRICE_ERROR = 'Selling price must be higher than unit cost. Lower the unit cost or increase the selling price.'
 
 function readLegacyList<T>(key: string): T[] {
@@ -94,6 +93,7 @@ function App() {
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [inventoryPage, setInventoryPage] = useState(1)
+  const [activityPage, setActivityPage] = useState(1)
   const [dialog, setDialog] = useState<Dialog>(null)
   const [notice, setNotice] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -191,15 +191,19 @@ function App() {
       || (filter === 'expiring' && daysUntil(product.expiryDate) <= 14)
     return matchesQuery && matchesCategory && matchesFilter
   })
-  const totalInventoryPages = Math.max(1, Math.ceil(visibleProducts.length / INVENTORY_PAGE_SIZE))
+  const totalInventoryPages = Math.max(1, Math.ceil(visibleProducts.length / TABLE_PAGE_SIZE))
   const currentInventoryPage = Math.min(inventoryPage, totalInventoryPages)
-  const pageStartIndex = (currentInventoryPage - 1) * INVENTORY_PAGE_SIZE
-  const pageProducts = visibleProducts.slice(pageStartIndex, pageStartIndex + INVENTORY_PAGE_SIZE)
+  const pageStartIndex = (currentInventoryPage - 1) * TABLE_PAGE_SIZE
+  const pageProducts = visibleProducts.slice(pageStartIndex, pageStartIndex + TABLE_PAGE_SIZE)
   const firstVisibleItem = visibleProducts.length ? pageStartIndex + 1 : 0
-  const lastVisibleItem = Math.min(pageStartIndex + INVENTORY_PAGE_SIZE, visibleProducts.length)
+  const lastVisibleItem = Math.min(pageStartIndex + TABLE_PAGE_SIZE, visibleProducts.length)
   const categories = [...new Set(products.map((product) => product.category))].sort((left, right) => left.localeCompare(right))
 
-  const recentMovements = [...movements].sort((left, right) => right.date.localeCompare(left.date)).slice(0, 6)
+  const orderedMovements = [...movements].sort((left, right) => right.date.localeCompare(left.date))
+  const totalActivityPages = Math.max(1, Math.ceil(orderedMovements.length / TABLE_PAGE_SIZE))
+  const currentActivityPage = Math.min(activityPage, totalActivityPages)
+  const pageMovements = orderedMovements.slice((currentActivityPage - 1) * TABLE_PAGE_SIZE, currentActivityPage * TABLE_PAGE_SIZE)
+  const recentMovements = orderedMovements.slice(0, 6)
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -483,7 +487,7 @@ function App() {
   }
 
   async function deleteInventoryProduct(product: Product) {
-    if (!window.confirm(`Delete ${product.name} from inventory? Its stock activity history will be kept.`)) return
+    if (!window.confirm(`Delete ${product.name} and all of its stock activity records? This cannot be undone.`)) return
     try {
       await removeProduct(product.id)
     } catch (error) {
@@ -491,10 +495,8 @@ function App() {
       return
     }
     setProducts((current) => current.filter((item) => item.id !== product.id))
-    setMovements((current) => current.map((movement) => movement.productId === product.id
-      ? { ...movement, productId: '' }
-      : movement))
-    setNotice(`${product.name} deleted from inventory`)
+    setMovements((current) => current.filter((movement) => movement.productId !== product.id))
+    setNotice(`${product.name} and its stock activity records deleted`)
   }
 
   return (
@@ -570,13 +572,13 @@ function App() {
             <div className="panel table-panel"><div className="table-summary"><span>Showing <strong>{firstVisibleItem}-{lastVisibleItem}</strong> of <strong>{visibleProducts.length}</strong> items</span><span className="table-summary-right">Prices in your local currency</span></div>
               <div className="table-scroll"><table className="inventory-table"><thead><tr><th>ITEM</th><th>ON HAND</th><th>UNIT COST</th><th>SELL PRICE</th><th>EXPIRATION</th><th>STATUS</th><th><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{pageProducts.map((product) => <InventoryTableRow key={product.id} product={product} onReceive={() => setDialog({ type: 'movement', productId: product.id, movement: 'purchase' })} onSell={() => setDialog({ type: 'movement', productId: product.id, movement: 'sale' })} onEdit={() => setDialog({ type: 'product', product })} onDelete={() => { void deleteInventoryProduct(product) }} />)}</tbody></table></div>
               {!visibleProducts.length && <div className="empty-table"><Package size={24} /><strong>No matching items</strong><span>Try another search or add a product.</span></div>}
-              {totalInventoryPages > 1 && <nav className="inventory-pagination" aria-label="Inventory pages"><span>Page {currentInventoryPage} of {totalInventoryPages}</span><div><button type="button" className="button button-secondary" onClick={() => setInventoryPage(currentInventoryPage - 1)} disabled={currentInventoryPage === 1}>Previous</button><button type="button" className="button button-secondary" onClick={() => setInventoryPage(currentInventoryPage + 1)} disabled={currentInventoryPage === totalInventoryPages}>Next</button></div></nav>}
+              <TablePagination itemCount={visibleProducts.length} page={currentInventoryPage} onPageChange={setInventoryPage} label="Inventory" />
             </div>
           </>}
 
           {view === 'activity' && <>
             <section className="page-heading inventory-heading"><div><div className="eyebrow"><span className="eyebrow-line" />MOVEMENT LOG</div><h1>Stock activity.</h1><p>A dated record of everything received and sold.</p></div><button className="button button-primary" onClick={() => setDialog({ type: 'movement', productId: products[0]?.id ?? '', movement: 'purchase' })} disabled={!products.length}><Plus size={17} />Record purchase</button></section>
-            <div className="panel log-panel"><div className="table-scroll"><table className="inventory-table movement-table"><thead><tr><th>DATE</th><th>ITEM</th><th>ACTIVITY</th><th>QUANTITY</th><th>UNIT COST</th><th>SALE PRICE</th><th>TOTAL</th><th><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{[...movements].sort((a, b) => b.date.localeCompare(a.date)).map((movement) => <tr key={movement.id}><td>{dateLabel(movement.date)}</td><td><strong className="item-name">{movement.productName}</strong><span className="subline">{movement.note}</span></td><td><span className={`movement-badge ${movement.type}`}>{movement.type === 'purchase' ? <><ArrowDownLeft size={13} />Stock in</> : <><ArrowUpRight size={13} />Sale</>}</span></td><td>{movement.quantity}</td><td>{money(movement.unitCost ?? movement.unitPrice)}</td><td>{movement.type === 'sale' ? money(movement.unitPrice) : '-'}</td><td><strong>{money(movement.quantity * movement.unitPrice)}</strong></td><td><div className="row-actions"><button title="Edit activity" onClick={() => setEditingMovement(movement)}><Pencil size={14} /></button><button title="Delete activity" onClick={() => deleteMovement(movement.id)}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table></div>{!movements.length && <div className="empty-table"><Clock3 size={24} /><strong>No activity recorded</strong><span>When you receive stock or record a sale, it will show here.</span></div>}</div>
+            <div className="panel log-panel"><div className="table-scroll"><table className="inventory-table movement-table"><thead><tr><th>DATE</th><th>ITEM</th><th>ACTIVITY</th><th>QUANTITY</th><th>UNIT COST</th><th>SALE PRICE</th><th>TOTAL</th><th><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{pageMovements.map((movement) => <tr key={movement.id}><td>{dateLabel(movement.date)}</td><td><strong className="item-name">{movement.productName}</strong><span className="subline">{movement.note}</span></td><td><span className={`movement-badge ${movement.type}`}>{movement.type === 'purchase' ? <><ArrowDownLeft size={13} />Stock in</> : <><ArrowUpRight size={13} />Sale</>}</span></td><td>{movement.quantity}</td><td>{money(movement.unitCost ?? movement.unitPrice)}</td><td>{movement.type === 'sale' ? money(movement.unitPrice) : '-'}</td><td><strong>{money(movement.quantity * movement.unitPrice)}</strong></td><td><div className="row-actions"><button title="Edit activity" onClick={() => setEditingMovement(movement)}><Pencil size={14} /></button><button title="Delete activity" onClick={() => deleteMovement(movement.id)}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table></div>{!movements.length && <div className="empty-table"><Clock3 size={24} /><strong>No activity recorded</strong><span>When you receive stock or record a sale, it will show here.</span></div>}<TablePagination itemCount={orderedMovements.length} page={currentActivityPage} onPageChange={setActivityPage} label="Stock activity" /></div>
           </>}
           {view === 'sales' && <SalesPage sales={movements.filter((movement): movement is Movement & { type: 'sale' } => movement.type === 'sale').map((movement) => ({ ...movement, unitCost: movement.unitCost ?? products.find((product) => product.id === movement.productId)?.cost ?? 0 }))} onEdit={(id) => setEditingMovement(movements.find((movement) => movement.id === id) ?? null)} onDelete={deleteMovement} />}
           {view === 'gcash' && <GcashPage records={gcashRecords} onSave={persistGcashRecord} onDelete={removeGcashRecord} />}
