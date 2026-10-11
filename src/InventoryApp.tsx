@@ -3,6 +3,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Boxes,
+  BarChart3,
   CalendarClock,
   Check,
   ChevronDown,
@@ -21,7 +22,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { GcashPage, SalesPage, TablePagination, TABLE_PAGE_SIZE, type GcashTransaction } from './SalesPages.tsx'
+import { GcashPage, KeyMetricsPage, SalesPage, TablePagination, TABLE_PAGE_SIZE, type GcashTransaction } from './SalesPages.tsx'
 import type { Movement, Product } from './types.ts'
 import {
   addCategory as saveNewCategory,
@@ -42,7 +43,7 @@ import { supabase } from './lib/supabase.ts'
 import type { Session } from '@supabase/supabase-js'
 import './anita.css'
 
-type View = 'overview' | 'categories' | 'inventory' | 'activity' | 'sales' | 'gcash'
+type View = 'overview' | 'categories' | 'inventory' | 'activity' | 'sales' | 'gcash' | 'metrics'
 type InventoryFilter = 'all' | 'low' | 'expiring'
 type Dialog = { type: 'product'; product?: Product } | { type: 'movement'; productId: string; movement: 'purchase' | 'sale' } | null
 type LegacyRecords = { products: Product[]; movements: Movement[]; gcashRecords: GcashTransaction[] }
@@ -653,6 +654,7 @@ function App() {
           <button className={view === 'activity' ? 'nav-link active' : 'nav-link'} onClick={() => { setView('activity'); setMobileNavOpen(false) }}><ArrowDownLeft size={18} />Stock activity</button>
           <button className={view === 'sales' ? 'nav-link active' : 'nav-link'} onClick={() => { setView('sales'); setMobileNavOpen(false) }}><TrendingUp size={18} />Sales</button>
           <button className={view === 'gcash' ? 'nav-link active' : 'nav-link'} onClick={() => { setView('gcash'); setMobileNavOpen(false) }}><Wallet size={18} />GCash</button>
+          <button className={view === 'metrics' ? 'nav-link active' : 'nav-link'} onClick={() => { setView('metrics'); setMobileNavOpen(false) }}><BarChart3 size={18} />Key metrics</button>
         </nav>
         <div className="side-label side-label-alerts">REMINDERS</div>
         <button className="alert-link" onClick={() => openInventory('low')}><span className="alert-dot low-dot" />Low stock<span className="alert-count">{lowStock.length}</span></button>
@@ -668,7 +670,7 @@ function App() {
       <main className="main-area">
         <header className="topbar">
           <button className="mobile-menu icon-button" title="Open menu" onClick={() => setMobileNavOpen((open) => !open)}><Menu size={20} /></button>
-          <div className="breadcrumbs">Anita <span>/</span> <strong>{view === 'overview' ? 'Overview' : view === 'categories' ? 'Category' : view === 'inventory' ? 'Inventory' : view === 'activity' ? 'Stock activity' : view === 'sales' ? 'Sales' : 'GCash'}</strong></div>
+          <div className="breadcrumbs">Anita <span>/</span> <strong>{view === 'overview' ? 'Overview' : view === 'categories' ? 'Category' : view === 'inventory' ? 'Inventory' : view === 'activity' ? 'Stock activity' : view === 'sales' ? 'Sales' : view === 'gcash' ? 'GCash' : 'Key metrics'}</strong></div>
           <div className="topbar-actions">
             {!['sales', 'gcash'].includes(view) && <span className="today-label"><CalendarClock size={15} />{dateLabel(today)}</span>}
             <button className="button button-secondary export-button" onClick={exportWorkbook}><Download size={16} />Export Excel</button>
@@ -760,6 +762,7 @@ function App() {
           </>}
           {view === 'sales' && <SalesPage sales={movements.filter((movement): movement is Movement & { type: 'sale' } => movement.type === 'sale').map((movement) => ({ ...movement, unitCost: movement.unitCost ?? products.find((product) => product.id === movement.productId)?.cost ?? 0 }))} onEdit={(id) => setEditingMovement(movements.find((movement) => movement.id === id) ?? null)} onDelete={deleteMovement} />}
           {view === 'gcash' && <GcashPage records={gcashRecords} onSave={persistGcashRecord} onDelete={removeGcashRecord} />}
+          {view === 'metrics' && <KeyMetricsPage sales={movements.filter((movement): movement is Movement & { type: 'sale' } => movement.type === 'sale').map((movement) => ({ ...movement, unitCost: movement.unitCost ?? products.find((product) => product.id === movement.productId)?.cost ?? 0 }))} />}
         </div>
         <footer className="main-footer"><span>ANITA'S INVENTORY</span><span>Synced to your shop account</span></footer>
       </main>

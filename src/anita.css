@@ -3136,3 +3136,118 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
         display: flex;
     }
 }
+
+.key-metrics-panel {
+    padding: 20px;
+}
+
+.key-metrics-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    margin-bottom: 14px;
+}
+
+.key-metrics-heading h2 {
+    margin: 0 0 8px;
+    font-size: 16px;
+}
+
+.key-metrics-total {
+    color: var(--forest);
+    font-size: 28px;
+    font-variant-numeric: tabular-nums;
+}
+
+.key-metrics-heading p {
+    margin: 6px 0 0;
+    color: #849188;
+    font-size: 13px;
+}
+
+.key-metrics-tabs {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid #e1e9df;
+    border-radius: 7px;
+    background: #edf3ec;
+}
+
+.key-metrics-tabs button {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 5px;
+    color: #718075;
+    background: transparent;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.key-metrics-tabs button.selected {
+    color: #fff;
+    background: var(--forest);
+    box-shadow: 0 1px 3px #173a3126;
+}
+
+.key-metrics-chart {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.key-metrics-chart svg {
+    display: block;
+    width: 100%;
+    min-width: 520px;
+    height: auto;
+}
+
+.key-metrics-grid-line {
+    stroke: #e9eee8;
+    stroke-width: 1;
+}
+
+.key-metrics-axis-line {
+    stroke: #d9e2d8;
+    stroke-width: 1;
+}
+
+.key-metrics-axis-label {
+    fill: #839087;
+    font-size: 11px;
+}
+
+.key-metrics-bar {
+    fill: #739b76;
+}
+
+.key-metrics-bar.profit {
+    fill: #d19a61;
+}
+
+.key-metrics-empty {
+    min-height: 210px;
+}
+
+@media (max-width: 620px) {
+    .key-metrics-panel {
+        padding: 15px 12px;
+    }
+
+    .key-metrics-heading {
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .key-metrics-tabs {
+        width: 100%;
+    }
+
+    .key-metrics-tabs button {
+        flex: 1;
+        padding: 0 8px;
+    }
+}

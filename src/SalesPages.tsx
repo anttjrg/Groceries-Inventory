@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react'
-import { ArrowLeft, ArrowRight, CalendarDays, Check, Pencil, Plus, Search, Trash2, Wallet, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BarChart3, CalendarDays, Check, Pencil, Plus, Search, Trash2, Wallet, X } from 'lucide-react'
 import './anita.css'
 
 export type SaleRecord = { id: string; productName: string; type: 'sale'; quantity: number; unitCost: number; unitPrice: number; date: string; note: string }
@@ -37,6 +37,29 @@ function formatRange(range: DateRange, period: Period) {
   return `${dateText(range.start, { month: 'short', day: 'numeric' })} - ${dateText(range.end)}`
 }
 function newId() { return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}` }
+function dateBuckets(range: DateRange, period: Period) {
+  if (period === 'year') {
+    return Array.from({ length: 12 }, (_, month) => {
+      const date = parseDate(range.start)
+      date.setMonth(month, 1)
+      return todayString(date).slice(0, 7)
+    })
+  }
+  const buckets: string[] = []
+  const date = parseDate(range.start)
+  const end = parseDate(range.end)
+  while (date <= end) {
+    buckets.push(todayString(date))
+    date.setDate(date.getDate() + 1)
+  }
+  return buckets
+}
+function bucketLabel(value: string, period: Period) {
+  if (period === 'year') return dateText(`${value}-01`, { month: 'short' })
+  if (period === 'day') return dateText(value, { month: 'short', day: 'numeric' })
+  if (period === 'week') return dateText(value, { weekday: 'short' })
+  return dateText(value, { day: 'numeric' })
+}
 
 export function TablePagination({ itemCount, page, onPageChange, label }: {
   itemCount: number
@@ -94,6 +117,74 @@ export function SalesPage({ sales, onEdit, onDelete }: { sales: SaleRecord[]; on
     <section className="sales-summary-grid"><article className="sales-summary-card"><span>Total selling price</span><strong>{amountText(total)}</strong><small>Sales recorded this {period}</small></article><article className="sales-summary-card"><span>Total cost</span><strong>{amountText(costTotal)}</strong><small>Cost of goods sold</small></article><article className="sales-summary-card profit-card"><span>Gross profit</span><strong>{amountText(profitTotal)}</strong><small>Selling price less cost</small></article><article className="sales-summary-card"><span>Units sold</span><strong>{units}</strong><small>Across {rows.length} sale {rows.length === 1 ? 'record' : 'records'}</small></article></section>
     {period !== 'day' && <section className="panel daily-breakdown"><div className="panel-heading"><div><h2>{period === 'year' ? 'Sales by month' : 'Sales by day'}</h2><p>{period === 'year' ? 'Monthly cost, sales and profit for this year.' : `Cost, sales and profit by day this ${period}.`}</p></div></div>{daily.size ? <div className="table-scroll"><table className="inventory-table daily-summary-table sales-daily-table"><thead><tr><th>{period === 'year' ? 'MONTH' : 'DATE'}</th><th>SALE RECORDS</th><th>TOTAL COST</th><th>TOTAL SELLING PRICE</th><th>GROSS PROFIT</th></tr></thead><tbody>{[...daily].sort(([a], [b]) => b.localeCompare(a)).map(([day, sum]) => <tr key={day}><td>{period === 'year' ? dateText(`${day}-01`, { month: 'long', year: 'numeric' }) : dateText(day, { weekday: 'short', month: 'short', day: 'numeric' })}</td><td>{sum.count}</td><td>{amountText(sum.costs)}</td><td>{amountText(sum.sales)}</td><td><strong>{amountText(sum.sales - sum.costs)}</strong></td></tr>)}</tbody><tfoot><tr><td colSpan={2}>Total this {period}</td><td>{amountText(costTotal)}</td><td>{amountText(total)}</td><td>{amountText(profitTotal)}</td></tr></tfoot></table></div> : <div className="empty-table"><CalendarDays size={23} /><strong>No sales in this period</strong><span>Inventory sales will be totaled here.</span></div>}</section>}
     <section className="panel sales-record-panel"><div className="panel-heading"><div><h2>Sale records</h2><p>Unit cost and selling price per item.</p></div><span className="record-count">{rows.length} records</span></div>{rows.length ? <><div className="table-scroll"><table className="inventory-table sales-table"><thead><tr><th>DATE</th><th>ITEM</th><th>QUANTITY</th><th>UNIT COST</th><th>SELL PRICE</th><th>GROSS PROFIT</th><th><span className="visually-hidden">Actions</span></th></tr></thead><tbody>{pageRows.map((sale) => { const saleCost = sale.quantity * sale.unitCost; const saleTotal = sale.quantity * sale.unitPrice; return <tr key={sale.id}><td>{dateText(sale.date)}</td><td><strong className="item-name">{sale.productName}</strong><span className="subline">{sale.note}</span></td><td>{sale.quantity}</td><td>{amountText(sale.unitCost)}</td><td>{amountText(sale.unitPrice)}</td><td className="profit-value">{amountText(saleTotal - saleCost)}</td><td><div className="row-actions"><button title="Edit sale" onClick={() => onEdit(sale.id)}><Pencil size={14} /></button><button title="Delete sale" onClick={() => onDelete(sale.id)}><Trash2 size={14} /></button></div></td></tr>})}</tbody><tfoot><tr><td colSpan={3}>Period totals</td><td>{amountText(costTotal)}</td><td>{amountText(total)}</td><td>{amountText(profitTotal)}</td><td /></tr></tfoot></table></div><TablePagination itemCount={rows.length} page={currentPage} onPageChange={setPage} label="Sales" /></> : <div className="empty-table"><CalendarDays size={23} /><strong>No sales for this date</strong><span>Record an item sale to see it here.</span></div>}</section>
+  </>
+}
+
+export function KeyMetricsPage({ sales }: { sales: SaleRecord[] }) {
+  const [period, setPeriod] = useState<Period>('day'), [date, setDate] = useState(todayString())
+  const [metric, setMetric] = useState<'sales' | 'profit'>('sales')
+  const range = rangeFor(date, period)
+  const rows = sales.filter((sale) => sale.date >= range.start && sale.date <= range.end)
+  const totalSales = rows.reduce((sum, sale) => sum + sale.quantity * sale.unitPrice, 0)
+  const totalCost = rows.reduce((sum, sale) => sum + sale.quantity * sale.unitCost, 0)
+  const totalProfit = totalSales - totalCost
+  const bucketTotals = new Map<string, number>()
+  rows.forEach((sale) => {
+    const key = period === 'year' ? sale.date.slice(0, 7) : sale.date
+    const value = metric === 'sales'
+      ? sale.quantity * sale.unitPrice
+      : sale.quantity * (sale.unitPrice - sale.unitCost)
+    bucketTotals.set(key, (bucketTotals.get(key) ?? 0) + value)
+  })
+  const points = dateBuckets(range, period).map((key) => ({ key, value: bucketTotals.get(key) ?? 0 }))
+  const chartValue = metric === 'sales' ? totalSales : totalProfit
+  const maxValue = Math.max(1, ...points.map((point) => point.value))
+  const chart = { width: 760, height: 300, left: 62, right: 18, top: 18, bottom: 48 }
+  const plotWidth = chart.width - chart.left - chart.right
+  const plotHeight = chart.height - chart.top - chart.bottom
+  const slotWidth = plotWidth / points.length
+  const barWidth = Math.min(32, slotWidth * 0.58)
+  const gridValues = Array.from({ length: 4 }, (_, index) => maxValue * (3 - index) / 3)
+
+  return <>
+    <section className="page-heading inventory-heading"><div><div className="eyebrow"><span className="eyebrow-line" />STORE PERFORMANCE</div><h1>Key metrics.</h1><p>Track selling price and gross profit over time.</p></div></section>
+    <PeriodPicker period={period} setPeriod={setPeriod} date={date} setDate={setDate} />
+    <section className="panel key-metrics-panel">
+      <div className="key-metrics-heading">
+        <div>
+          <h2>{metric === 'sales' ? 'Total selling price' : 'Total gross profit'}</h2>
+          <strong className="key-metrics-total">{amountText(chartValue)}</strong>
+          <p>{formatRange(range, period)}</p>
+        </div>
+        <div className="key-metrics-tabs" role="tablist" aria-label="Metric chart">
+          <button type="button" role="tab" aria-selected={metric === 'sales'} className={metric === 'sales' ? 'selected' : ''} onClick={() => setMetric('sales')}>Total selling price</button>
+          <button type="button" role="tab" aria-selected={metric === 'profit'} className={metric === 'profit' ? 'selected' : ''} onClick={() => setMetric('profit')}>Total gross profit</button>
+        </div>
+      </div>
+      {rows.length ? <div className="key-metrics-chart">
+        <svg viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label={`${metric === 'sales' ? 'Total selling price' : 'Total gross profit'} graph for ${formatRange(range, period)}`}>
+          {gridValues.map((value, index) => {
+            const y = chart.top + index * plotHeight / 3
+            return <g key={index}>
+              <line x1={chart.left} y1={y} x2={chart.width - chart.right} y2={y} className="key-metrics-grid-line" />
+              <text x={chart.left - 10} y={y + 4} textAnchor="end" className="key-metrics-axis-label">{amountText(value)}</text>
+            </g>
+          })}
+          <line x1={chart.left} y1={chart.top + plotHeight} x2={chart.width - chart.right} y2={chart.top + plotHeight} className="key-metrics-axis-line" />
+          {points.map((point, index) => {
+            const height = point.value / maxValue * plotHeight
+            const x = chart.left + slotWidth * index + (slotWidth - barWidth) / 2
+            const y = chart.top + plotHeight - height
+            return <g key={point.key}>
+              <rect x={x} y={y} width={barWidth} height={Math.max(height, point.value > 0 ? 2 : 0)} rx="3" className={metric === 'sales' ? 'key-metrics-bar sales' : 'key-metrics-bar profit'}>
+                <title>{`${bucketLabel(point.key, period)}: ${amountText(point.value)}`}</title>
+              </rect>
+              {(points.length <= 12 || index % 3 === 0 || index === points.length - 1) && <text x={chart.left + slotWidth * index + slotWidth / 2} y={chart.height - 17} textAnchor="middle" className="key-metrics-axis-label">{bucketLabel(point.key, period)}</text>}
+            </g>
+          })}
+        </svg>
+      </div> : <div className="empty-table key-metrics-empty"><BarChart3 size={24} /><strong>No sales in this period</strong><span>Record an item sale to see key metrics here.</span></div>}
+    </section>
   </>
 }
 
