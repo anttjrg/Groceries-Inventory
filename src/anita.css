@@ -1129,6 +1129,35 @@ button.metric-card:hover {
     font-size: 15px;
 }
 
+.inventory-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border-top: 1px solid #edf0ec;
+    color: #77817a;
+    font-size: 12px;
+}
+
+.inventory-pagination > div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inventory-pagination .button {
+    min-height: 32px;
+}
+
+.price-validation-error {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: #963e34;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
 .table-scroll {
     width: 100%;
     overflow-x: auto
@@ -2837,5 +2866,15 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
 
     .sales-summary-grid {
         grid-template-columns: minmax(0,1fr)
+    }
+
+    .inventory-pagination {
+        align-items: flex-start;
+        flex-direction: column
+    }
+
+    .inventory-pagination>div {
+        width: 100%;
+        justify-content: space-between
     }
 }
