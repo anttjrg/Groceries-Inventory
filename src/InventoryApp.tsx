@@ -44,6 +44,17 @@ type Dialog = { type: 'product'; product?: Product } | { type: 'movement'; produ
 type LegacyRecords = { products: Product[]; movements: Movement[]; gcashRecords: GcashTransaction[] }
 const PRODUCT_PRICE_ERROR = 'Selling price must be higher than unit cost. Lower the unit cost or increase the selling price.'
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+}
+
+declare global {
+  interface WindowEventMap {
+    beforeinstallprompt: BeforeInstallPromptEvent
+  }
+}
+
 function readLegacyList<T>(key: string): T[] {
   const stored = localStorage.getItem(key)
   if (!stored) return []
@@ -95,6 +106,8 @@ function App() {
   const [activityPage, setActivityPage] = useState(1)
   const [dialog, setDialog] = useState<Dialog>(null)
   const [notice, setNotice] = useState('')
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [appInstalled, setAppInstalled] = useState(() => window.matchMedia('(display-mode: standalone)').matches)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [editingMovement, setEditingMovement] = useState<Movement | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -131,6 +144,24 @@ function App() {
     return () => {
       active = false
       subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleInstallPrompt = (event: BeforeInstallPromptEvent) => {
+      event.preventDefault()
+      setInstallPrompt(event)
+    }
+    const handleAppInstalled = () => {
+      setAppInstalled(true)
+      setInstallPrompt(null)
+      setNotice('Anita is installed and available from your apps menu.')
+    }
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
     }
   }, [])
 
@@ -261,6 +292,21 @@ function App() {
   async function signOut() {
     const { error } = await supabase.auth.signOut()
     if (error) setNotice(`Could not sign out: ${error.message}`)
+  }
+
+  async function installApp() {
+    if (!installPrompt) {
+      setNotice('To install Anita, use your browser menu and choose “Install app” or “Install this site as an app”.')
+      return
+    }
+    try {
+      await installPrompt.prompt()
+      const { outcome } = await installPrompt.userChoice
+      setInstallPrompt(null)
+      if (outcome === 'dismissed') setNotice('App installation was canceled.')
+    } catch (error) {
+      setNotice(`Could not start app installation: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
   if (!authReady || (session && loadedUserId !== session.user.id)) {
@@ -519,7 +565,7 @@ function App() {
         <div className="sidebar-bottom">
           <div className="storage-indicator"><span className="storage-pulse" /><span>Connected to database</span><Check size={14} /></div>
           <p>Records sync across devices using your shop account.</p>
-          <a className="sign-out-button app-icon-download" href="/app-icon.svg" download="anita-app-icon.svg"><Download size={14} />Download app icon</a>
+          {!appInstalled && <button className="sign-out-button app-install-button" onClick={() => { void installApp() }}><Download size={14} />Install app</button>}
           <button className="sign-out-button" onClick={() => { void signOut() }}>Sign out</button>
         </div>
       </aside>
