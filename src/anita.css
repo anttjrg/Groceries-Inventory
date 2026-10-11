@@ -2512,6 +2512,16 @@ body:has(.gcash-summary-panel) .sales-summary-grid {
     border-color: #b6cbb6
 }
 
+.row-actions .inventory-delete-action {
+    color: #a34f45;
+}
+
+.row-actions .inventory-delete-action:hover {
+    color: #8e392f;
+    background: #fff3f1;
+    border-color: #e8c4bf;
+}
+
 .field-hint {
     color: #89958b;
     font-size: 12px;
