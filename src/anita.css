@@ -1636,6 +1636,16 @@ button.metric-card:hover {
     color: #a4aca5
 }
 
+.field input[type="date"] {
+    color: #3b4a3f;
+    cursor: pointer
+}
+
+.field input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: .8
+}
+
 .field select {
     appearance: none;
     cursor: pointer
