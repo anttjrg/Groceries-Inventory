@@ -120,7 +120,7 @@ export function SalesPage({ sales, onEdit, onDelete }: { sales: SaleRecord[]; on
   </>
 }
 
-export function KeyMetricsPage({ sales }: { sales: SaleRecord[] }) {
+export function KeyMetricsPage({ sales, gcash = [] }: { sales: SaleRecord[]; gcash?: GcashTransaction[] }) {
   const [period, setPeriod] = useState<Period>('day'), [date, setDate] = useState(todayString())
   const [metric, setMetric] = useState<'sales' | 'profit'>('sales')
   const range = rangeFor(date, period)
@@ -146,8 +146,13 @@ export function KeyMetricsPage({ sales }: { sales: SaleRecord[] }) {
   const barWidth = Math.min(32, slotWidth * 0.58)
   const gridValues = Array.from({ length: 4 }, (_, index) => maxValue * (3 - index) / 3)
 
+  const gcashRows = gcash.filter((row) => row.date >= range.start && row.date <= range.end)
+  const gcashVolume = gcashRows.reduce((sum, row) => sum + row.amount, 0)
+  const gcashFees = gcashRows.reduce((sum, row) => sum + row.fee, 0)
+  const gcashCollected = gcashVolume + gcashFees
+
   return <>
-    <section className="page-heading inventory-heading"><div><div className="eyebrow"><span className="eyebrow-line" />STORE PERFORMANCE</div><h1>Key metrics.</h1><p>Track selling price and gross profit over time.</p></div></section>
+    <section className="page-heading inventory-heading"><div><div className="eyebrow"><span className="eyebrow-line" />STORE PERFORMANCE</div><h1>Key metrics.</h1><p>Track selling price, gross profit and GCash totals over time.</p></div></section>
     <PeriodPicker period={period} setPeriod={setPeriod} date={date} setDate={setDate} />
     <section className="panel key-metrics-panel">
       <div className="key-metrics-heading">
@@ -184,6 +189,22 @@ export function KeyMetricsPage({ sales }: { sales: SaleRecord[] }) {
           })}
         </svg>
       </div> : <div className="empty-table key-metrics-empty"><BarChart3 size={24} /><strong>No sales in this period</strong><span>Record an item sale to see key metrics here.</span></div>}
+    </section>
+
+    <section className="panel key-metrics-panel">
+      <div className="key-metrics-heading">
+        <div>
+          <h2>GCash totals</h2>
+          <strong className="key-metrics-total">{amountText(gcashCollected)}</strong>
+          <p>{formatRange(range, period)}</p>
+        </div>
+      </div>
+      <section className="sales-summary-grid">
+        <article className="sales-summary-card"><span>Processed</span><strong>{amountText(gcashVolume)}</strong><small>Money processed this {period}</small></article>
+        <article className="sales-summary-card fee-card"><span>Fees</span><strong>{amountText(gcashFees)}</strong><small>GCash service fees</small></article>
+        <article className="sales-summary-card collected-card"><span>Amount + fees</span><strong>{amountText(gcashCollected)}</strong><small>{gcashRows.length} GCash {gcashRows.length === 1 ? 'record' : 'records'}</small></article>
+      </section>
+      {gcashRows.length ? <div className="table-scroll"><table className="inventory-table sales-table"><thead><tr><th>DATE</th><th>SERVICE</th><th>AMOUNT</th><th>FEE</th><th>TOTAL</th></tr></thead><tbody>{gcashRows.sort((a, b) => b.date.localeCompare(a.date)).map((row) => <tr key={row.id}><td>{dateText(row.date)}</td><td>{row.service}</td><td>{amountText(row.amount)}</td><td>{amountText(row.fee)}</td><td><strong>{amountText(row.amount + row.fee)}</strong></td></tr>)}</tbody></table></div> : <div className="empty-table key-metrics-empty"><Wallet size={24} /><strong>No GCash in this period</strong><span>Add a GCash transaction to see it here.</span></div>}
     </section>
   </>
 }
@@ -249,5 +270,5 @@ export function GcashPage({ records, onSave, onDelete }: {
 }
 
 function GcashDialog({ record, error, onClose, onSubmit }: { record: GcashTransaction | null; error: string; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void> }) {
-  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="gcash-dialog-title"><div className="modal-heading"><div><div className="eyebrow"><span className="eyebrow-line" />GCASH RECORD</div><h2 id="gcash-dialog-title">{record ? 'Edit transaction' : 'Add transaction'}</h2><p>Enter the amount and service fee.</p></div><button className="icon-button" type="button" title="Close" onClick={onClose}><X size={18} /></button></div>{error && <p className="auth-error" role="alert">{error}</p>}<form onSubmit={onSubmit}><div className="form-grid"><label className="field">Date<input name="date" type="date" defaultValue={record?.date ?? todayString()} required /></label><label className="field">Service<select name="service" defaultValue={record?.service ?? services[0]}>{services.map((service) => <option key={service}>{service}</option>)}</select></label><label className="field">Transaction amount<input name="amount" type="number" min="0.01" step="0.01" defaultValue={record?.amount} placeholder="0.00" required autoFocus /></label><label className="field">Fee collected<input name="fee" type="number" min="0" step="0.01" defaultValue={record?.fee ?? 0} required /></label><label className="field">Customer name <span className="optional-label">optional</span><input name="customerName" defaultValue={record?.customerName} placeholder="Name" /></label><label className="field">Phone number <span className="optional-label">optional</span><input name="phoneNumber" type="tel" defaultValue={record?.phoneNumber} placeholder="09XX XXX XXXX" /></label><label className="field full-field">Reference number <span className="optional-label">optional</span><input name="reference" defaultValue={record?.reference} placeholder="Transaction reference" /></label></div><div className="modal-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary" type="submit">{record ? <Check size={15} /> : <Plus size={15} />}{record ? 'Save changes' : 'Save transaction'}</button></div></form></section></div>
+  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="gcash-dialog-title"><div className="modal-heading"><div><div className="eyebrow"><span className="eyebrow-line" />GCASH RECORD</div><h2 id="gcash-dialog-title">{record ? 'Edit transaction' : 'Add transaction'}</h2><p>Enter the amount and service fee.</p></div><button className="icon-button" type="button" title="Close" onClick={onClose}><X size={18} /></button></div>{error && <p className="auth-error" role="alert">{error}</p>}<form onSubmit={onSubmit}><div className="form-grid"><label className="field">Service<select name="service" defaultValue={record?.service ?? services[0]}>{services.map((service) => <option key={service}>{service}</option>)}</select></label><label className="field">Transaction amount<input name="amount" type="number" min="0.01" step="0.01" defaultValue={record?.amount} placeholder="0.00" required autoFocus /></label><label className="field">Fee collected<input name="fee" type="number" min="0" step="0.01" defaultValue={record?.fee ?? 0} required /></label><label className="field">Customer name <span className="optional-label">optional</span><input name="customerName" defaultValue={record?.customerName} placeholder="Name" /></label><label className="field">Phone number <span className="optional-label">optional</span><input name="phoneNumber" type="tel" defaultValue={record?.phoneNumber} placeholder="09XX XXX XXXX" /></label><label className="field full-field">Date<input name="date" type="date" max={todayString()} defaultValue={record?.date ?? todayString()} required /></label><label className="field full-field">Reference number <span className="optional-label">optional</span><input name="reference" defaultValue={record?.reference} placeholder="Transaction reference" /></label></div><div className="modal-actions"><button type="button" className="button button-secondary" onClick={onClose}>Cancel</button><button className="button button-primary" type="submit">{record ? <Check size={15} /> : <Plus size={15} />}{record ? 'Save changes' : 'Save transaction'}</button></div></form></section></div>
 }
