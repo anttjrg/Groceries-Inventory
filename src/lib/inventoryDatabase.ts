@@ -6,25 +6,38 @@ function throwIfError(error: { message: string } | null) {
   if (error) throw new Error(error.message)
 }
 
+const PAGE_SIZE = 500
+
+async function fetchAllPages<T>(fetchPage: (from: number, to: number) => PromiseLike<{
+  data: T[] | null
+  error: { message: string } | null
+}>) {
+  const rows: T[] = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await fetchPage(from, from + PAGE_SIZE - 1)
+    throwIfError(error)
+    const page = data ?? []
+    rows.push(...page)
+    if (page.length < PAGE_SIZE) return rows
+  }
+}
+
 function isMissingCategoriesTable(error: { code?: string } | null) {
   return error?.code === '42P01' || error?.code === 'PGRST205'
 }
 
 export async function loadInventory() {
-  const [productsResult, movementsResult, gcashResult, categoriesResult] = await Promise.all([
-    supabase.from('products').select('*').order('name'),
-    supabase.from('movements').select('*').order('date', { ascending: false }),
-    supabase.from('gcash_transactions').select('*').order('date', { ascending: false }),
+  const [productRows, movementRows, gcashRows, categoriesResult] = await Promise.all([
+    fetchAllPages((from, to) => supabase.from('products').select('*').order('name').order('id').range(from, to)),
+    fetchAllPages((from, to) => supabase.from('movements').select('*').order('date', { ascending: false }).order('id').range(from, to)),
+    fetchAllPages((from, to) => supabase.from('gcash_transactions').select('*').order('date', { ascending: false }).order('id').range(from, to)),
     supabase.from('categories').select('name').order('name'),
   ])
-  throwIfError(productsResult.error)
-  throwIfError(movementsResult.error)
-  throwIfError(gcashResult.error)
   if (categoriesResult.error && !isMissingCategoriesTable(categoriesResult.error)) {
     throwIfError(categoriesResult.error)
   }
 
-  const products: Product[] = (productsResult.data ?? []).map((row) => ({
+  const products: Product[] = productRows.map((row) => ({
     id: row.id,
     name: row.name,
     category: row.category,
@@ -35,7 +48,7 @@ export async function loadInventory() {
     reorderLevel: Number(row.reorder_level),
     expiryDate: row.expiry_date ?? '',
   }))
-  const movements: Movement[] = (movementsResult.data ?? []).map((row) => ({
+  const movements: Movement[] = movementRows.map((row) => ({
     id: row.id,
     productId: row.product_id ?? '',
     productName: row.product_name,
@@ -46,7 +59,7 @@ export async function loadInventory() {
     date: row.date,
     note: row.note,
   }))
-  const gcashRecords: GcashTransaction[] = (gcashResult.data ?? []).map((row) => ({
+  const gcashRecords: GcashTransaction[] = gcashRows.map((row) => ({
     id: row.id,
     date: row.date,
     service: row.service,
